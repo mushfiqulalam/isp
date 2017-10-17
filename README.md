@@ -19,3 +19,9 @@ Starting from raw to final jpg image there are multiple operations such as:
 (15) Distortion correction
 
 In this developing work I will add more and more algorithms.
+
+Furthermore, several input images are provided so that you can test the code.
+
+Link to the original algorithms are provided for further studies.
+
+Please leave your thoughts and comments at: mushfiqulalam@gmail.com
