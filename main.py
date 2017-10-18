@@ -64,9 +64,16 @@ data = imaging.channel_gain_white_balance(data,\
 utility.imsave(data, "images/out_channel_gain_white_balance.png", "uint16")
 
 # ===================================
+# Bayer denoising
+# ===================================
+temp = imaging.bayer_denoising(data)
+data = temp.utilize_hvs_behavior("rggb")
+utility.imsave(data, "images/out_bayer_denoising.png", "uint16")
+
+# ===================================
 # Demosacking
 # ===================================
-data = imaging.demosaic_mhc(np.uint16(data), raw.get_bayer_pattern(), [0, 65535], True)
+data = imaging.demosaic_mhc(np.uint16(data), raw.get_bayer_pattern(), [0, 65535], False)
 utility.imsave(data, "images/out_demosaic.png", "uint16")
 
 # ===================================
@@ -80,6 +87,9 @@ utility.imsave(data, "images/out_demosaic.png", "uint16")
 # ===================================
 # Gamma
 # ===================================
+temp = imaging.nonlinearity(data, "gamma")
+data = temp.by_value(1/2.2, [0, 65535])
+utility.imsave(data, "images/out_gamma.png", "uint16")
 
 # ===================================
 # Chromatic aberration correction

@@ -182,8 +182,6 @@ def bad_pixel_correction(data, neighborhood_size):
 
     # number of pixels to be padded at the borders
     no_of_pixel_pad = math.floor(neighborhood_size / 2.)
-    # debug
-    print(str(no_of_pixel_pad))
 
     for idx in range(0, len(D)): # perform same operation for each quarter
 
@@ -191,19 +189,12 @@ def bad_pixel_correction(data, neighborhood_size):
         print("bad pixel correction: Quarter " + str(idx+1) + " of 4")
 
         img = D[idx]
-        size = np.shape(img)
-        width  = size[1]
-        height = size[0]
-        # debug
-        print("width: " + str(width) + " height: " + str(height))
+        width, height = utility.get_width_height(img)
 
         # pad pixels at the borders
         img = np.pad(img, \
                      (no_of_pixel_pad, no_of_pixel_pad),\
                      'reflect') # reflect would not repeat the border value
-
-        # debug
-        print(str(np.shape(img)))
 
         for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
             for j in range(no_of_pixel_pad, width + no_of_pixel_pad):
@@ -256,9 +247,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
     raw = np.float32(raw)
 
     # dimensions
-    size = np.shape(raw)
-    width  = size[1]
-    height = size[0]
+    width, height = utility.get_width_height(raw)
 
     # number of pixels to pad
     no_of_pixel_pad = 2
@@ -307,7 +296,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Green: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
         # Red and Blue channel
         for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
@@ -369,7 +358,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Red/Blue: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
 
     elif (bayer_pattern == "gbrg"):
@@ -404,7 +393,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Green: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
         # Red and Blue channel
         for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
@@ -466,7 +455,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Red/Blue: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
     elif (bayer_pattern == "grbg"):
 
@@ -500,7 +489,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Green: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
         # Red and Blue channel
         for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
@@ -562,7 +551,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Red/Blue: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
     elif (bayer_pattern == "bggr"):
 
@@ -596,7 +585,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Green: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
         # Red and Blue channel
         for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
@@ -658,7 +647,7 @@ def demosaic_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=Fals
             if (timeshow):
                 elapsed_time = time.process_time() - t0
                 print("Red/Blue: row index: " + str(i-1) + " of " + str(height) + \
-                      " | elapsed time: " + str(elapsed_time) + " seconds")
+                      " | elapsed time: " + "{:.3f}".format(elapsed_time) + " seconds")
 
     else:
         print("Invalid bayer pattern. Valid pattern can be rggb, gbrg, grbg, bggr")
@@ -712,9 +701,7 @@ class lens_shading_correction:
         # Note: approximate_mathematical_compensation require less memory
         print("----------------------------------------------------")
         print("Running lens shading correction with approximate mathematical compensation...")
-        size = np.shape(self.data)
-        width  = size[1]
-        height = size[0]
+        width, height = utility.get_width_height(self.data)
 
         center_pixel_pos = [height/2, width/2]
         max_distance = utility.distance_euclid(center_pixel_pos, [height, width])
@@ -736,3 +723,77 @@ class lens_shading_correction:
         return "lens shading correction. There are two methods: " + \
                 "\n (1) flat_field_compensation: requires dark_current_image and flat_field_image" + \
                 "\n (2) approximate_mathematical_compensation:"
+
+# =============================================================
+# class: lens_shading_correction
+#   Correct the lens shading / vignetting
+# =============================================================
+class bayer_denoising:
+    def __init__(self, data, name="bayer_denoising"):
+        # convert to float32 in case it was not
+        self.data = np.float32(data)
+        self.name = name
+
+    def utilize_hvs_behavior(self, bayer_pattern):
+        # Based on paper titled "Noise Reduction for CFA Image Sensors
+        #   Exploiting HVS Behaviour," by Angelo Bosco, Sebastiano Battiato,
+        #   Arcangelo Bruna and Rosetta Rizzo
+        #   Sensors 2009, 9, 1692-1713; doi:10.3390/s90301692
+
+        print("----------------------------------------------------")
+        print("Running bayer denoising...")
+
+        # copy the self.data to raw and we will only work on raw
+        # to make sure no change happen to self.data
+        raw = self.data
+        width, height = utility.get_width_height(raw)
+
+        # First make the bayer_pattern rggb
+        # The algorithm is written only for rggb pattern, thus convert all other
+        # pattern to rggb. Furthermore, this shuffling does not affect the
+        # algorithm output
+        if (bayer_pattern != "rggb"):
+            raw = utility.shuffle_bayer_pattern(self.data, bayer_pattern, "rggb")
+
+        # pad two pixels at the border
+        no_of_pixel_pad = 2     # number of pixels to pad
+        raw = np.pad(raw, \
+                     (no_of_pixel_pad, no_of_pixel_pad),\
+                     'reflect') # reflect would not repeat the border value
+
+        return raw
+
+    def __str__(self):
+        pass
+
+
+# =============================================================
+# class: nonlinearity
+#   apply gamma or degamma
+# =============================================================
+class nonlinearity:
+    def __init__(self, data, name="nonlinearity"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def by_value(self, value, clip_range):
+
+        print("----------------------------------------------------")
+        print("Running nonlinearity by value...")
+
+        # clip within the range
+        data = np.clip(self.data, clip_range[0], clip_range[1])
+        # make 0 to 1
+        data = data / clip_range[1]
+        # apply nonlinearity
+        return np.clip(clip_range[1] * (data**value), clip_range[0], clip_range[1])
+
+    def by_table(self, table, clip_range):
+
+        print("----------------------------------------------------")
+        print("Running nonlinearity by table...")
+
+        pass
+
+    def __str__(self):
+        pass

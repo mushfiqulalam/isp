@@ -1,3 +1,12 @@
+# =============================================================
+# This file contains helper functions and classes
+#
+# Mushfiqul Alam, 2017
+#
+# Report bugs/suggestions:
+#   mushfiqulalam@gmail.com
+# =============================================================
+
 import png
 import numpy as np
 import scipy.misc
@@ -108,6 +117,17 @@ def imsave(data, output_name, output_dtype="uint8", input_dtype="uint8", is_scal
         return
 
 # =============================================================
+# function: get_width_height
+#   returns width, height
+# =============================================================
+def get_width_height(data):
+    size = np.shape(data)
+    width = size[1]
+    height = size[0]
+    return width, height
+
+
+# =============================================================
 # function: distance_euclid
 #   returns Euclidean distance between two points
 # =============================================================
@@ -148,3 +168,92 @@ class synthetic_image_generate:
 
     def create_random_noise_image(self):
         pass
+
+
+# =============================================================
+# function: bayer_channel_separation
+#   Objective: Outputs four channels of the bayer pattern
+#   Input:
+#       data:   the bayer data
+#       pattern:    rggb, grbg, gbrg, or bggr
+#   Output:
+#       R, G1, G2, B (Quarter resolution images)
+# =============================================================
+def bayer_channel_separation(data, pattern):
+    if (pattern == "rggb"):
+        R = data[::2, ::2]
+        G1 = data[::2, 1::2]
+        G2 = data[1::2, ::2]
+        B = data[1::2, 1::2]
+    elif (pattern == "grbg"):
+        G1 = data[::2, ::2]
+        R = data[::2, 1::2]
+        B = data[1::2, ::2]
+        G2 = data[1::2, 1::2]
+    elif (pattern == "gbrg"):
+        G1 = data[::2, ::2]
+        B = data[::2, 1::2]
+        R = data[1::2, ::2]
+        G2 = data[1::2, 1::2]
+    elif (pattern == "bggr"):
+        B = data[::2, ::2]
+        G1 = data[::2, 1::2]
+        G2 = data[1::2, ::2]
+        R = data[1::2, 1::2]
+    else:
+        print("pattern must be one of these: rggb, grbg, gbrg, bggr")
+        return
+
+    return R, G1, G2, B
+
+
+# =============================================================
+# function: bayer_channel_integration
+#   Objective: combine data into a raw according to pattern
+#   Input:
+#       R, G1, G2, B:   the four separate channels (Quarter resolution)
+#       pattern:    rggb, grbg, gbrg, or bggr
+#   Output:
+#       data (Full resolution image)
+# =============================================================
+def bayer_channel_integration(R, G1, G2, B, pattern):
+    size = np.shape(R)
+    data = np.empty((size[0]*2, size[1]*2), dtype=np.float32)
+    if (pattern == "rggb"):
+        data[::2, ::2] = R
+        data[::2, 1::2] = G1
+        data[1::2, ::2] = G2
+        data[1::2, 1::2] = B
+    elif (pattern == "grbg"):
+        data[::2, ::2] = G1
+        data[::2, 1::2] = R
+        data[1::2, ::2] = B
+        data[1::2, 1::2] = G2
+    elif (pattern == "gbrg"):
+        data[::2, ::2] = G1
+        data[::2, 1::2] = B
+        data[1::2, ::2] = R
+        data[1::2, 1::2] = G2
+    elif (pattern == "bggr"):
+        data[::2, ::2] = B
+        data[::2, 1::2] = G1
+        data[1::2, ::2] = G2
+        data[1::2, 1::2] = R
+    else:
+        print("pattern must be one of these: rggb, grbg, gbrg, bggr")
+        return
+
+    return data
+
+
+# =============================================================
+# function: shuffle_bayer_pattern
+#   convert from one bayer pattern to another
+# =============================================================
+def shuffle_bayer_pattern(data, input_pattern, output_pattern):
+
+    # Get separate channels
+    R, G1, G2, B = bayer_channel_separation(data, input_pattern)
+
+    # return integrated data
+    return bayer_channel_integration(R, G1, G2, B, output_pattern)
