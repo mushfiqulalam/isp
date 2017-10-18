@@ -734,8 +734,15 @@ class bayer_denoising:
         self.data = np.float32(data)
         self.name = name
 
-    def utilize_hvs_behavior(self, bayer_pattern):
-        # Based on paper titled "Noise Reduction for CFA Image Sensors
+    def utilize_hvs_behavior(self, bayer_pattern, neighborhood_size, initial_noise_level, hvs_min, hvs_max, clip_range, threshold_red_blue):
+        # Objective: bayer denoising
+        # Inputs:
+        #   bayer_pattern:  rggb, gbrg, grbg, bggr
+        #   neighborhood_size: 5 or 9
+        #   initial_noise_level:
+        # Output:
+        #   denoised bayer raw output
+        # Source: Based on paper titled "Noise Reduction for CFA Image Sensors
         #   Exploiting HVS Behaviour," by Angelo Bosco, Sebastiano Battiato,
         #   Arcangelo Bruna and Rosetta Rizzo
         #   Sensors 2009, 9, 1692-1713; doi:10.3390/s90301692
@@ -746,6 +753,7 @@ class bayer_denoising:
         # copy the self.data to raw and we will only work on raw
         # to make sure no change happen to self.data
         raw = self.data
+        raw = np.clip(raw, clip_range[0], clip_range[1])
         width, height = utility.get_width_height(raw)
 
         # First make the bayer_pattern rggb
@@ -755,13 +763,166 @@ class bayer_denoising:
         if (bayer_pattern != "rggb"):
             raw = utility.shuffle_bayer_pattern(self.data, bayer_pattern, "rggb")
 
+        # check neighborhood_size
+        if ((neighborhood_size != 5) and (neighborhood_size != 7)):
+            print("neighborhood_size must be 5 or 9")
+            return raw
+
         # pad two pixels at the border
-        no_of_pixel_pad = 2     # number of pixels to pad
+        no_of_pixel_pad = math.floor(neighborhood_size)   # number of pixels to pad
         raw = np.pad(raw, \
                      (no_of_pixel_pad, no_of_pixel_pad),\
                      'reflect') # reflect would not repeat the border value
 
-        return raw
+        # allocating space for denoised output
+        denoised_out = np.empty((height, width), dtype=np.float32)
+        if (neighborhood_size == 5):
+
+            for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
+                for j in range(no_of_pixel_pad, width + no_of_pixel_pad):
+
+                    # center pixel
+                    center_pixel = raw[i, j]
+
+                    # signal analyzer block
+                    half_max = clip_range[1] / 2
+                    if (center_pixel <= half_max):
+                        hvs_weight = -(((hvs_max - hvs_min) * center_pixel) / half_max) + hvs_max
+                    else:
+                        hvs_weight = (((center_pixel - clip_range[1]) * (hvs_max - hvs_min))/(clip_range[1] - half_max)) + hvs_max
+
+                    # noise level estimator previous value
+                    if (j < no_of_pixel_pad+2):
+                        noise_level_previous_red   = initial_noise_level
+                        noise_level_previous_blue  = initial_noise_level
+                        noise_level_previous_green = initial_noise_level
+                    else:
+                        noise_level_previous_green = noise_level_current_green
+                        if ((i % 2) == 0):
+                            noise_level_previous_red = noise_level_current_red
+                        else:
+                            noise_level_previous_blue = noise_level_current_blue
+
+                    # Processings depending on Green or Red/Blue
+                    # Red
+                    if (((i % 2) == 0) and ((j % 2) == 0)):
+
+                        # get neighborhood
+                        neighborhood = [raw[i-2, j-2], raw[i-2, j], raw[i-2, j+2],\
+                                        raw[i, j-2], raw[i, j+2],\
+                                        raw[i+2, j-2], raw[i+2, j], raw[i+2, j+2]]
+
+                        # absolute difference from the center pixel
+                        d =  np.abs(neighborhood - center_pixel)
+
+                        # maximum and minimum difference
+                        d_max = np.max(d)
+                        d_min = np.min(d)
+
+                        # calculate texture_threshold
+                        texture_threshold = hvs_weight + noise_level_previous_red
+
+                        # texture degree analyzer
+                        if (d_max <= threshold_red_blue):
+                            texture_degree = 1.
+                        elif (d_max > threshold_red_blue) and (d_max <= texture_threshold):
+                            texture_degree = -((d_max - threshold_red_blue) / (texture_threshold - threshold_red_blue)) + 1.
+                        else:
+                            texture_degree = 0.
+
+                        # noise level estimator update
+                        noise_level_current_red = texture_degree * d_max + (1 - texture_degree) * noise_level_previous_red
+
+                    # Blue
+                    elif (((i % 2) != 0) and ((j % 2) != 0)):
+
+                        # get neighborhood
+                        neighborhood = [raw[i-2, j-2], raw[i-2, j], raw[i-2, j+2],\
+                                        raw[i, j-2], raw[i, j+2],\
+                                        raw[i+2, j-2], raw[i+2, j], raw[i+2, j+2]]
+
+                        # absolute difference from the center pixel
+                        d =  np.abs(neighborhood - center_pixel)
+
+                        # maximum and minimum difference
+                        d_max = np.max(d)
+                        d_min = np.min(d)
+
+                        # calculate texture_threshold
+                        texture_threshold = hvs_weight + noise_level_previous_blue
+
+                        # texture degree analyzer
+                        if (d_max <= threshold_red_blue):
+                            texture_degree = 1.
+                        elif (d_max > threshold_red_blue) and (d_max <= texture_threshold):
+                            texture_degree = -((d_max - threshold_red_blue) / (texture_threshold - threshold_red_blue)) + 1.
+                        elif (d_max > texture_threshold):
+                            texture_degree = 0.
+
+                        # noise level estimator update
+                        noise_level_current_blue = texture_degree * d_max + (1 - texture_degree) * noise_level_previous_blue
+
+                    # Green
+                    else:
+                        neighborhood = [raw[i-2, j-1], raw[i-2, j+1],\
+                                        raw[i-1, j-2], raw[i-1, j], raw[i-1, j+2],\
+                                        raw[i, j-1], raw[i, j+1],\
+                                        raw[i+1, j-2], raw[i+1, j], raw[i+1, j+2],\
+                                        raw[i+2, j-1], raw[i+2, j+1]]
+
+                        # difference from the center pixel
+                        d = np.abs(neighborhood - center_pixel)
+
+                        # maximum and minimum difference
+                        d_max = np.max(d)
+                        d_min = np.min(d)
+
+                        # calculate texture_threshold
+                        texture_threshold = hvs_weight + noise_level_previous_green
+
+                        # texture degree analyzer
+                        if (d_max == 0):
+                            texture_degree = 1.
+                        elif ((d_max > 0) and (d_max <= texture_threshold)):
+                            texture_degree = -(d_max / texture_threshold) + 1.
+                        elif (d_max > texture_threshold):
+                            texture_degree = 0.
+
+                        # noise level estimator update
+                        noise_level_current_green = texture_degree * d_max + (1 - texture_degree) * noise_level_previous_green
+
+                    # similarity threshold calculation
+                    if (texture_degree == 1):
+                        threshold_low = threshold_high = d_max
+                    elif (texture_degree == 0):
+                        threshold_low = d_min
+                        threshold_high = (d_max + d_min) / 2
+                    else:
+                        threshold_high = (d_max + (d_max + d_min) / 2) / 2
+                        threshold_low = (d_min + threshold_high) / 2
+
+                    # weight computation
+                    weight = np.empty(np.size(d), dtype=np.float32)
+                    pf = 0.
+                    for i in range(0, np.size(d)):
+                        if (d[i] <= threshold_low):
+                            weight[i] = 1.
+                        elif (d[i] > threshold_high):
+                            weight[i] = 0.
+                        else:
+                            weight[i] = 1. + (d[i] - threshold_low) / (threshold_low - threshold_high)
+
+                        pf += weight[i] * neighborhood[i] + (1. - weight[i]) * center_pixel
+
+                    denoised_out[i - no_of_pixel_pad, j-no_of_pixel_pad] = pf / np.size(d)
+
+        elif (neighborhood_size == 9):
+            pass
+
+        if (bayer_pattern != "rggb"):
+            denoised_out = utility.shuffle_bayer_pattern(denoised_out, "rggb", bayer_pattern)
+
+        return np.clip(denoised_out, clip_range[0], clip_range[1])
 
     def __str__(self):
         pass
