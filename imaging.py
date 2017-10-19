@@ -734,7 +734,7 @@ class bayer_denoising:
         self.data = np.float32(data)
         self.name = name
 
-    def utilize_hvs_behavior(self, bayer_pattern, neighborhood_size, initial_noise_level, hvs_min, hvs_max, clip_range, threshold_red_blue):
+    def utilize_hvs_behavior(self, bayer_pattern, neighborhood_size, initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range):
         # Objective: bayer denoising
         # Inputs:
         #   bayer_pattern:  rggb, gbrg, grbg, bggr

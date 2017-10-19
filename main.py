@@ -78,12 +78,12 @@ utility.imsave(data, "images/out_channel_gain_white_balance.png", "uint16")
 # ===================================
 temp = imaging.bayer_denoising(data)
 neighborhood_size = 5
-initial_noise_level = 65535/10
+initial_noise_level = 1000
 hvs_min = 1000
-hvs_max = 60000
+hvs_max = 5000
 clip_range = [0, 65535]
 threshold_red_blue = 100
-data = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), neighborhood_size, initial_noise_level, hvs_min, hvs_max, clip_range, threshold_red_blue)
+data = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), neighborhood_size, initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
 utility.imsave(data, "images/out_bayer_denoising.png", "uint16")
 
 # ===================================
