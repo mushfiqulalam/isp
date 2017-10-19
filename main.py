@@ -23,12 +23,22 @@ raw.set_color_space("raw")
 raw.set_bayer_pattern("rggb")
 raw.set_channel_gain((1.94921875, 1.0, 1.0, 1.34375))
 raw.set_bit_depth(14)
-raw.set_black_level((1000, 600, 600, 600))
+raw.set_black_level((600, 600, 600, 600))
+
+# ===================================
+# Add noise
+# ===================================
+temp = utility.synthetic_image_generate(raw.get_width(), raw.get_height())
+noise_mean = 0
+noise_standard_deviation = 500
+seed = 100
+clip_range = [600, 65535]
+data = temp.create_noisy_image(raw.data, noise_mean, noise_standard_deviation, seed, clip_range)
 
 # ===================================
 # Black level correction
 # ===================================
-data = imaging.black_level_correction(raw.data, \
+data = imaging.black_level_correction(data, \
                                       raw.get_black_level())
 utility.imsave(data, "images/out_black_level_correction.png", "uint16")
 
@@ -38,14 +48,14 @@ utility.imsave(data, "images/out_black_level_correction.png", "uint16")
 # normally dark_current_image and flat_field_image are
 # captured in the image quality lab using flat field chart
 # here we are synthetically generating thouse two images
-temp = utility.synthetic_image_generate()
+temp = utility.synthetic_image_generate(raw.get_width(), raw.get_height())
 dark_current_image, flat_field_image = temp.create_lens_shading_correction_images(\
-  raw.get_width(), raw.get_height(), 0, 65535, 40000)
+  0, 65535, 40000)
 # save the dark_current_image and flat_field_image for viewing
 utility.imsave(dark_current_image, "images/dark_current_image.png", "uint16")
 utility.imsave(flat_field_image, "images/flat_field_image.png", "uint16")
-lsc = imaging.lens_shading_correction(data)
-data = lsc.flat_field_compensation(dark_current_image, flat_field_image)
+temp = imaging.lens_shading_correction(data)
+data = temp.flat_field_compensation(dark_current_image, flat_field_image)
 # data = lsc.approximate_mathematical_compensation([0.01759, -28.37, -13.36])
 utility.imsave(data, "images/out_lens_shading_correction.png", "uint16")
 

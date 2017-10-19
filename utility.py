@@ -140,23 +140,27 @@ def distance_euclid(point1, point2):
 #   creates sysnthetic images for different purposes
 # =============================================================
 class synthetic_image_generate:
-    def __init__(self, name="synthetic_image"):
+    def __init__(self, width, height, name="synthetic_image"):
         self.name = name
+        self.width = width
+        self.height = height
 
-    def create_lens_shading_correction_images(self, width, height, dark_current=0, flat_max=65535, flat_min=0, clip_max=65535, clip_min=0):
-        dark_current_image = dark_current * np.ones((height, width), dtype=np.float32)
-        flat_field_image = np.empty((height, width), dtype=np.float32)
+    def create_lens_shading_correction_images(self, dark_current=0, flat_max=65535, flat_min=0, clip_range=[0, 65535]):
+        # Objective: creates two images:
+        #               dark_current_image and flat_field_image
+        dark_current_image = dark_current * np.ones((self.height, self.width), dtype=np.float32)
+        flat_field_image = np.empty((self.height, self.width), dtype=np.float32)
 
-        center_pixel_pos = [height/2, width/2]
-        max_distance = distance_euclid(center_pixel_pos, [height, width])
+        center_pixel_pos = [self.height/2, self.width/2]
+        max_distance = distance_euclid(center_pixel_pos, [self.height, self.width])
 
-        for i in range(0, height):
-            for j in range(0, width):
+        for i in range(0, self.height):
+            for j in range(0, self.width):
                 flat_field_image[i, j] = (max_distance - distance_euclid(center_pixel_pos, [i, j])) / max_distance
                 flat_field_image[i, j] = flat_min + flat_field_image[i, j] * (flat_max - flat_min)
 
-        dark_current_image = np.clip(dark_current_image, clip_min, clip_max)
-        flat_field_image = np.clip(flat_field_image, clip_min, clip_max)
+        dark_current_image = np.clip(dark_current_image, clip_range[0], clip_range[1])
+        flat_field_image = np.clip(flat_field_image, clip_range[0], clip_range[1])
 
         return dark_current_image, flat_field_image
 
@@ -166,8 +170,14 @@ class synthetic_image_generate:
     def create_color_gradient_image(self):
         pass
 
-    def create_random_noise_image(self):
-        pass
+    def create_random_noise_image(self, mean=0, standard_deviation=1, seed=0):
+        # Creates normally distributed noisy image
+        np.random.seed(seed)
+        return np.random.normal(mean, standard_deviation, (self.height, self.width))
+
+    def create_noisy_image(self, data, mean=0, standard_deviation=1, seed=0, clip_range=[0, 65535]):
+        # Adds normally distributed noise to the data
+        return np.clip(data + self.create_random_noise_image(mean, standard_deviation, seed), clip_range[0], clip_range[1])
 
 
 # =============================================================
