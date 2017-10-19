@@ -30,7 +30,7 @@ raw.set_black_level((600, 600, 600, 600))
 # ===================================
 temp = utility.synthetic_image_generate(raw.get_width(), raw.get_height())
 noise_mean = 0
-noise_standard_deviation = 500
+noise_standard_deviation = 100
 seed = 100
 clip_range = [600, 65535]
 data = temp.create_noisy_image(raw.data, noise_mean, noise_standard_deviation, seed, clip_range)
@@ -78,13 +78,16 @@ utility.imsave(data, "images/out_channel_gain_white_balance.png", "uint16")
 # ===================================
 temp = imaging.bayer_denoising(data)
 neighborhood_size = 5
-initial_noise_level = 1000
+initial_noise_level = 65535 * 10 / 100
 hvs_min = 1000
-hvs_max = 5000
+hvs_max = 2000
 clip_range = [0, 65535]
-threshold_red_blue = 100
-data = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), neighborhood_size, initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
+threshold_red_blue = 1300
+# data is the denoised output
+# ignoring the second output
+data, _ = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
 utility.imsave(data, "images/out_bayer_denoising.png", "uint16")
+#utility.imsave(np.clip(texture_degree_debug*65535, 0, 65535), "images/out_texture_degree_debug.png", "uint16")
 
 # ===================================
 # Demosacking
