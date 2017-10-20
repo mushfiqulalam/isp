@@ -83,17 +83,18 @@ hvs_min = 1000
 hvs_max = 2000
 clip_range = [0, 65535]
 threshold_red_blue = 1300
-# data is the denoised output
-# ignoring the second output
+# data is the denoised output, ignoring the second output
 data, _ = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
 utility.imsave(data, "images/out_bayer_denoising.png", "uint16")
-#utility.imsave(np.clip(texture_degree_debug*65535, 0, 65535), "images/out_texture_degree_debug.png", "uint16")
+# utility.imsave(np.clip(texture_degree_debug*65535, 0, 65535), "images/out_texture_degree_debug.png", "uint16")
 
 # ===================================
-# Demosacking
+# Demosacing
 # ===================================
-data = imaging.demosaic_mhc(np.uint16(data), raw.get_bayer_pattern(), [0, 65535], False)
+temp = imaging.demosaic(data, raw.get_bayer_pattern())
+data = temp.mhc(True)
 utility.imsave(data, "images/out_demosaic.png", "uint16")
+
 
 # ===================================
 # Color aliasing correction
