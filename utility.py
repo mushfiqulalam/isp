@@ -121,10 +121,16 @@ def imsave(data, output_name, output_dtype="uint8", input_dtype="uint8", is_scal
 #   returns width, height
 # =============================================================
 def get_width_height(data):
-    size = np.shape(data)
-    width = size[1]
-    height = size[0]
-    return width, height
+    # We assume data be in height x width x number of channel x frames format
+    if (np.ndim(data) > 1):
+        size = np.shape(data)
+        width = size[1]
+        height = size[0]
+        return width, height
+    else:
+        print("data dimension must be 2 or greater")
+
+
 
 
 # =============================================================
