@@ -116,6 +116,7 @@ def imsave(data, output_name, output_dtype="uint8", input_dtype="uint8", is_scal
         print("output_name should contain extensions of .raw, .png, or .jpg")
         return
 
+
 # =============================================================
 # function: get_width_height
 #   returns width, height
@@ -131,14 +132,40 @@ def get_width_height(data):
         print("data dimension must be 2 or greater")
 
 
-
-
 # =============================================================
 # function: distance_euclid
 #   returns Euclidean distance between two points
 # =============================================================
 def distance_euclid(point1, point2):
     return math.sqrt((point1[0] - point2[0])**2 + (point1[1]-point2[1])**2)
+
+
+# =============================================================
+# class: special_functions
+#   pass input through special functions
+# =============================================================
+class special_function:
+    def __init__(self, data, name="special function"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def soft_coring(self, slope, tau_threshold, gamma_speed):
+        # Usage: Used in the unsharp masking sharpening Process
+        # Input:
+        #   slope:                  controls the boost.
+        #                           the amount of sharpening, higher slope
+        #                           means more aggresssive sharpening
+        #
+        #   tau_threshold:          controls the amount of coring.
+        #                           threshold value till which the image is
+        #                           not sharpened. The lower the value of
+        #                           tau_threshold the more frequencies
+        #                           goes through the sharpening process
+        #
+        #   gamma_speed:            controls the speed of convergence to the slope
+        #                           smaller value gives a little bit more
+        #                           sharpened image, this may be a fine tuner
+        return slope * self.data * ( 1. - np.exp(-((np.abs(self.data / tau_threshold))**gamma_speed)))
 
 
 # =============================================================
@@ -273,3 +300,60 @@ def shuffle_bayer_pattern(data, input_pattern, output_pattern):
 
     # return integrated data
     return bayer_channel_integration(R, G1, G2, B, output_pattern)
+
+
+# =============================================================
+# class: create_filter
+#   creates different filters, generally 2D filters
+# =============================================================
+class create_filter:
+    def __init__(self, name="filter"):
+        self.name = name
+
+    def gaussian(self, kernel_size, sigma):
+
+        # calculate which number to where the grid should be
+        # remember that, kernel_size[0] is the width of the kernel
+        # and kernel_size[1] is the height of the kernel
+        temp = np.floor(np.float32(kernel_size) / 2.)
+
+        # create the grid
+        # example: if kernel_size = [5, 3], then:
+        # x: array([[-2., -1.,  0.,  1.,  2.],
+        #           [-2., -1.,  0.,  1.,  2.],
+        #           [-2., -1.,  0.,  1.,  2.]])
+        # y: array([[-1., -1., -1., -1., -1.],
+        #           [ 0.,  0.,  0.,  0.,  0.],
+        #           [ 1.,  1.,  1.,  1.,  1.]])
+        x, y = np.meshgrid(np.linspace(-temp[0], temp[0], kernel_size[0]),\
+                           np.linspace(-temp[1], temp[1], kernel_size[1]))
+
+        # Gaussian equation
+        temp = np.exp( -(x**2 + y**2) / (2. * sigma**2) )
+
+        # make kernel sum equal to 1
+        return temp / np.sum(temp)
+
+    def gaussian_separable(self, kernel_size, sigma):
+
+        # calculate which number to where the grid should be
+        # remember that, kernel_size[0] is the width of the kernel
+        # and kernel_size[1] is the height of the kernel
+        temp = np.floor(np.float32(kernel_size) / 2.)
+
+        # create the horizontal kernel
+        x = np.linspace(-temp[0], temp[0], kernel_size[0])
+        x = x.reshape((1, kernel_size[0])) # reshape to create row vector
+        hx = np.exp(-x**2 / (2 * sigma**2))
+        hx = hx / np.sum(hx)
+
+        # create the vertical kernel
+        y = np.linspace(-temp[1], temp[1], kernel_size[1])
+        y = y.reshape((kernel_size[1], 1)) # reshape to create column vector
+        hy = np.exp(-y**2 / (2 * sigma**2))
+        hy = hy / np.sum(hy)
+
+        return hx, hy
+
+    def __str__(self):
+        return self.name

@@ -18,6 +18,7 @@ do_channel_gain_white_balance = True
 do_demosaic = True
 do_color_correction = True
 do_gamma = True
+do_sharpening = True
 
 # ===================================
 # Remove all the .png files
@@ -161,8 +162,15 @@ else:
 # ===================================
 if do_gamma:
     temp = imaging.nonlinearity(data, "gamma")
-    data = temp.by_value(1/2.2, [0, 65535])
+
+    # by value
+    #data = temp.by_value(1/2.2, [0, 65535])
+
+    # by table
+    data = temp.by_table("tables/GammaE.txt", "gamma", [0, 65535])
+
     utility.imsave(data, "images/out_gamma.png", "uint16")
+
 else:
     pass
 
@@ -185,6 +193,15 @@ else:
 # ===================================
 # Sharpening
 # ===================================
+if do_sharpening:
+    temp = imaging.sharpening(data)
+
+    data = temp.unsharp_masking()
+
+    utility.imsave(data, "images/out_sharpening.png", "uint16")
+
+else:
+    pass
 
 # ===================================
 # Distortion correction

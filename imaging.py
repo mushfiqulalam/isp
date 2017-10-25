@@ -1,14 +1,19 @@
 # Note:
 #   The functions try to operate in float32 data precision
 
+# =============================================================
 # Import the libraries
-import numpy as np
-import math
+# =============================================================
+import numpy as np  # array operations
+import math         # basing math operations
 from matplotlib import pylab as plt
-import time
+import time         # measure runtime
 import utility
 import debayer
-import os, sys
+import sys          # float precision
+from scipy import signal        # convolutions
+
+
 
 # =============================================================
 # class: ImageInfo
@@ -158,6 +163,7 @@ def black_level_correction(raw, black_level, white_level, clip_range):
 
     return data
 
+
 # =============================================================
 # function: channel_gain_white_balance
 #   multiply with the white balance channel gains
@@ -181,6 +187,7 @@ def channel_gain_white_balance(data, channel_gain):
     data = np.clip(data, 0., None) # upper level not necessary
 
     return data
+
 
 # =============================================================
 # function: bad_pixel_correction
@@ -258,6 +265,7 @@ def bad_pixel_correction(data, neighborhood_size):
     data[1::2, 1::2] = D[3]
 
     return data
+
 
 # =============================================================
 # class: demosaic
@@ -339,6 +347,7 @@ class lens_shading_correction:
         return "lens shading correction. There are two methods: " + \
                 "\n (1) flat_field_compensation: requires dark_current_image and flat_field_image" + \
                 "\n (2) approximate_mathematical_compensation:"
+
 
 # =============================================================
 # class: lens_shading_correction
@@ -542,6 +551,7 @@ class bayer_denoising:
     def __str__(self):
         return self.name
 
+
 # =============================================================
 # class: color_correction
 #   Correct the color in linaer domain
@@ -671,12 +681,89 @@ class nonlinearity:
         # apply nonlinearity
         return np.clip(clip_range[1] * (data**value), clip_range[0], clip_range[1])
 
-    def by_table(self, table, clip_range):
+    def by_table(self, table, nonlinearity_type="gamma", clip_range=[0, 65535]):
 
         print("----------------------------------------------------")
         print("Running nonlinearity by table...")
 
-        pass
+        gamma_table = np.loadtxt(table)
+        gamma_table = clip_range[1] * gamma_table / np.max(gamma_table)
+        linear_table = np.linspace(clip_range[0], clip_range[1], np.size(gamma_table))
+
+        # linear interpolation, query is the self.data
+        if (nonlinearity_type == "gamma"):
+            # mapping is from linear_table to gamma_table
+            return np.clip(np.interp(self.data, linear_table, gamma_table), clip_range[0], clip_range[1])
+        elif (nonlinearity_type == "degamma"):
+            # mapping is from gamma_table to linear_table
+            return np.clip(np.interp(self.data, gamma_table, linear_table), clip_range[0], clip_range[1])
+
+    def __str__(self):
+        return self.name
+
+
+# =============================================================
+# class: sharpening
+#   sharpens the image
+# =============================================================
+class sharpening:
+    def __init__(self, data, name="sharpening"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def unsharp_masking(self, gaussian_kernel_size=[5, 5], gaussian_sigma=2.0,\
+                        slope=1.5, tau_threshold=0.05, gamma_speed=4., clip_range=[0, 65535]):
+        # Objective: sharpen image
+        # Input:
+        #   gaussian_kernel_size:   dimension of the gaussian blur filter kernel
+        #
+        #   gaussian_sigma:         spread of the gaussian blur filter kernel
+        #                           bigger sigma more sharpening
+        #
+        #   slope:                  controls the boost.
+        #                           the amount of sharpening, higher slope
+        #                           means more aggresssive sharpening
+        #
+        #   tau_threshold:          controls the amount of coring.
+        #                           threshold value till which the image is
+        #                           not sharpened. The lower the value of
+        #                           tau_threshold the more frequencies
+        #                           goes through the sharpening process
+        #
+        #   gamma_speed:            controls the speed of convergence to the slope
+        #                           smaller value gives a little bit more
+        #                           sharpened image, this may be a fine tuner
+
+        print("----------------------------------------------------")
+        print("Running sharpening by unsharp masking...")
+
+        # create gaussian kernel
+        temp = utility.create_filter("gaussian")
+        gaussian_kernel = temp.gaussian(gaussian_kernel_size, gaussian_sigma)
+
+        # convolove the image with the gaussian kernel
+        # first input is the image
+        # second input is the kernel
+        # output shape will be the same as the first input
+        # boundary will be padded by using symmetrical method while convolving
+        if np.ndim(self.data > 2):
+            image_blur = np.empty(np.shape(self.data), dtype=np.float32)
+            for i in range(0, np.shape(self.data)[2]):
+                image_blur[:, :, i] = signal.convolve2d(self.data[:, :, i], gaussian_kernel, mode="same", boundary="symm")
+        else:
+            image_blur = signal.convolove2d(self.data, gaussian_kernel, mode="same", boundary="symm")
+
+        # the high frequency component image
+        image_high_pass = self.data - image_blur
+
+        # soft coring (see in utility)
+        # basically pass the high pass image via a slightly nonlinear function
+        tau_threshold = tau_threshold * clip_range[1]
+        temp = utility.special_function(image_high_pass, "soft coring")
+
+        # add the soft cored high pass image to the original and clip
+        # within range and return
+        return np.clip(self.data + temp.soft_coring(slope, tau_threshold, gamma_speed), clip_range[0], clip_range[1])
 
     def __str__(self):
         return self.name
