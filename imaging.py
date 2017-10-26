@@ -703,6 +703,62 @@ class nonlinearity:
 
 
 # =============================================================
+# class: tone_mapping
+#   improve the overall tone of the image
+# =============================================================
+class tone_mapping:
+    def __init__(self, data, name="tone mapping"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def nonlinear_masking(self, strength_multiplier=1.0, gaussian_kernel_size=[5, 5], gaussian_sigma=1.0, clip_range=[0, 65535]):
+        # Objective: improves the overall tone of the image
+        # Inputs:
+        #   strength_multiplier: >0. The higher the more aggressing tone mapping
+        #   gaussian_kernel_size: kernel size for calculating the mask image
+        #   gaussian_sigma: spread of the gaussian kernel for calculating the
+        #                   mask image
+        #
+        # Source:
+        # N. Moroney, “Local color correction using non-linear masking”,
+        # Proc. IS&T/SID 8th Color Imaging Conference, pp. 108-111, (2000)
+        #
+        # Note, Slight changes is carried by mushfiqul alam, specifically
+        # introducing the strength_multiplier
+
+        print("----------------------------------------------------")
+        print("Running tone mapping by non linear masking...")
+
+        # convert to gray image
+        if (np.ndim(self.data) == 3):
+            gray_image = utility.color_conversion(self.data).rgb2gray()
+        else:
+            gray_image = self.data
+
+        # gaussian blur the gray image
+        gaussian_kernel = utility.create_filter().gaussian(gaussian_kernel_size, gaussian_sigma)
+
+        # the mask image:   (1) blur
+        #                   (2) bring within range 0 to 1
+        #                   (3) multiply with strength_multiplier
+        mask = signal.convolve2d(gray_image, gaussian_kernel, mode="same", boundary="symm")
+        mask = strength_multiplier * mask / clip_range[1]
+
+        # calculate the alpha image
+        temp = np.power(0.5, mask)
+        if (np.ndim(self.data) == 3):
+            width, height = utility.get_width_height(self.data)
+            alpha = np.empty((height, width, 3), dtype=np.float32)
+            alpha[:, :, 0] = temp
+            alpha[:, :, 1] = temp
+            alpha[:, :, 2] = temp
+        else:
+            alpha = temp
+
+        # output
+        return np.clip(clip_range[1] * np.power(self.data/clip_range[1], alpha), clip_range[0], clip_range[1])
+
+# =============================================================
 # class: sharpening
 #   sharpens the image
 # =============================================================
@@ -738,8 +794,7 @@ class sharpening:
         print("Running sharpening by unsharp masking...")
 
         # create gaussian kernel
-        temp = utility.create_filter("gaussian")
-        gaussian_kernel = temp.gaussian(gaussian_kernel_size, gaussian_sigma)
+        gaussian_kernel = utility.create_filter().gaussian(gaussian_kernel_size, gaussian_sigma)
 
         # convolove the image with the gaussian kernel
         # first input is the image
@@ -759,11 +814,12 @@ class sharpening:
         # soft coring (see in utility)
         # basically pass the high pass image via a slightly nonlinear function
         tau_threshold = tau_threshold * clip_range[1]
-        temp = utility.special_function(image_high_pass, "soft coring")
 
         # add the soft cored high pass image to the original and clip
         # within range and return
-        return np.clip(self.data + temp.soft_coring(slope, tau_threshold, gamma_speed), clip_range[0], clip_range[1])
+        return np.clip(self.data + utility.special_function(\
+                   image_high_pass).soft_coring(\
+                   slope, tau_threshold, gamma_speed), clip_range[0], clip_range[1])
 
     def __str__(self):
         return self.name

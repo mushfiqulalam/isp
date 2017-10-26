@@ -10,15 +10,16 @@ import os,sys
 # ===================================
 # Which stages to run
 # ===================================
-do_denoise = False
+do_denoise = True #False
 do_black_level_correction = True
 do_lens_shading_correction = True
-do_bad_pixel_correction = False
+do_bad_pixel_correction = True #False
 do_channel_gain_white_balance = True
 do_demosaic = True
 do_color_correction = True
 do_gamma = True
-do_sharpening = True
+do_tone_mapping = True
+do_sharpening = True #False
 
 # ===================================
 # Remove all the .png files
@@ -50,12 +51,13 @@ data = raw.data
 # Add noise
 # ===================================
 if do_denoise:
-    temp = utility.synthetic_image_generate(raw.get_width(), raw.get_height())
     noise_mean = 0
     noise_standard_deviation = 100
     seed = 100
     clip_range = [600, 65535]
-    data = temp.create_noisy_image(data, noise_mean, noise_standard_deviation, seed, clip_range)
+    data = utility.synthetic_image_generate(\
+    raw.get_width(), raw.get_height()).create_noisy_image(\
+    data, noise_mean, noise_standard_deviation, seed, clip_range)
 else:
     pass
 
@@ -78,16 +80,16 @@ if do_lens_shading_correction:
     # normally dark_current_image and flat_field_image are
     # captured in the image quality lab using flat field chart
     # here we are synthetically generating thouse two images
-    temp = utility.synthetic_image_generate(raw.get_width(), raw.get_height())
-    dark_current_image, flat_field_image = temp.create_lens_shading_correction_images(\
+    dark_current_image, flat_field_image = utility.synthetic_image_generate(\
+    raw.get_width(), raw.get_height()).create_lens_shading_correction_images(\
                                     0, 65535, 40000)
 
     # save the dark_current_image and flat_field_image for viewing
     utility.imsave(dark_current_image, "images/dark_current_image.png", "uint16")
     utility.imsave(flat_field_image, "images/flat_field_image.png", "uint16")
 
-    temp = imaging.lens_shading_correction(data)
-    data = temp.flat_field_compensation(dark_current_image, flat_field_image)
+    data = imaging.lens_shading_correction(data).flat_field_compensation(\
+    dark_current_image, flat_field_image)
 
     # data = lsc.approximate_mathematical_compensation([0.01759, -28.37, -13.36])
     utility.imsave(data, "images/out_lens_shading_correction.png", "uint16")
@@ -119,17 +121,22 @@ else:
 # Bayer denoising
 # ===================================
 if do_denoise:
-    temp = imaging.bayer_denoising(data)
+
+    # bayer denoising parameters
     neighborhood_size = 5
     initial_noise_level = 65535 * 10 / 100
     hvs_min = 1000
     hvs_max = 2000
     clip_range = [0, 65535]
     threshold_red_blue = 1300
+
     # data is the denoised output, ignoring the second output
-    data, _ = temp.utilize_hvs_behavior(raw.get_bayer_pattern(), initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
+    data, _ = imaging.bayer_denoising(data).utilize_hvs_behavior(\
+    raw.get_bayer_pattern(), initial_noise_level, hvs_min, hvs_max, threshold_red_blue, clip_range)
+
     utility.imsave(data, "images/out_bayer_denoising.png", "uint16")
     # utility.imsave(np.clip(texture_degree_debug*65535, 0, 65535), "images/out_texture_degree_debug.png", "uint16")
+
 else:
     pass
 
@@ -137,8 +144,7 @@ else:
 # Demosacing
 # ===================================
 if do_demosaic:
-    temp = imaging.demosaic(data, raw.get_bayer_pattern())
-    data = temp.mhc(False)
+    data = imaging.demosaic(data, raw.get_bayer_pattern()).mhc(False)
     utility.imsave(data, "images/out_demosaic.png", "uint16")
 else:
     pass
@@ -151,8 +157,7 @@ else:
 # Color correction
 # ===================================
 if do_color_correction:
-    temp = imaging.color_correction(data, raw.get_color_matrix())
-    data = temp.apply_cmatrix()
+    data = imaging.color_correction(data, raw.get_color_matrix()).apply_cmatrix()
     utility.imsave(data, "images/out_color_correction.png", "uint16")
 else:
     pass
@@ -161,13 +166,12 @@ else:
 # Gamma
 # ===================================
 if do_gamma:
-    temp = imaging.nonlinearity(data, "gamma")
 
     # by value
-    #data = temp.by_value(1/2.2, [0, 65535])
+    #data = imaging.nonlinearity(data, "gamma").by_value(1/2.2, [0, 65535])
 
     # by table
-    data = temp.by_table("tables/GammaE.txt", "gamma", [0, 65535])
+    data = imaging.nonlinearity(data, "gamma").by_table("tables/GammaE.txt", "gamma", [0, 65535])
 
     utility.imsave(data, "images/out_gamma.png", "uint16")
 
@@ -181,6 +185,13 @@ else:
 # ===================================
 # Tone mapping
 # ===================================
+if do_tone_mapping:
+    data = imaging.tone_mapping(data).nonlinear_masking(1.0)
+
+    utility.imsave(data, "images/out_tone_mapping.png", "uint16")
+
+else:
+    pass
 
 # ===================================
 # Memory color enhancement
@@ -194,9 +205,8 @@ else:
 # Sharpening
 # ===================================
 if do_sharpening:
-    temp = imaging.sharpening(data)
 
-    data = temp.unsharp_masking()
+    data = imaging.sharpening(data).unsharp_masking()
 
     utility.imsave(data, "images/out_sharpening.png", "uint16")
 

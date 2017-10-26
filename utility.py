@@ -357,3 +357,21 @@ class create_filter:
 
     def __str__(self):
         return self.name
+
+
+# =============================================================
+# class: color_conversion
+#   color conversion from one color space to another
+# =============================================================
+class color_conversion:
+    def __init__(self, data, name="color conversion"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def rgb2gray(self):
+        return 0.299 * self.data[:, :, 0] +\
+               0.587 * self.data[:, :, 1] +\
+               0.114 * self.data[:, :, 2]
+
+    def __str__(self):
+        return self.name
