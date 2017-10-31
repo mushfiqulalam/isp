@@ -10,16 +10,19 @@ import os,sys
 # ===================================
 # Which stages to run
 # ===================================
-do_denoise = True #False
+do_add_noise = False
 do_black_level_correction = True
-do_lens_shading_correction = True
-do_bad_pixel_correction = True #False
+do_lens_shading_correction = False #True
+do_bad_pixel_correction = False
 do_channel_gain_white_balance = True
+do_bayer_denoise = False
 do_demosaic = True
 do_color_correction = True
 do_gamma = True
-do_tone_mapping = True
-do_sharpening = True #False
+do_tone_mapping = False #True
+do_noise_reduction = False
+do_sharpening = False
+do_distortion_correction = True
 
 # ===================================
 # Remove all the .png files
@@ -50,7 +53,7 @@ data = raw.data
 # ===================================
 # Add noise
 # ===================================
-if do_denoise:
+if do_add_noise:
     noise_mean = 0
     noise_standard_deviation = 100
     seed = 100
@@ -120,7 +123,7 @@ else:
 # ===================================
 # Bayer denoising
 # ===================================
-if do_denoise:
+if do_bayer_denoise:
 
     # bayer denoising parameters
     neighborhood_size = 5
@@ -178,6 +181,7 @@ if do_gamma:
 else:
     pass
 
+
 # ===================================
 # Chromatic aberration correction
 # ===================================
@@ -200,6 +204,17 @@ else:
 # ===================================
 # Noise reduction
 # ===================================
+if do_noise_reduction:
+
+    # sigma filter parameters
+    neighborhood_size = 7
+    sigma = [1000, 500, 500]
+    data = imaging.noise_reduction(data).sigma_filter(neighborhood_size, sigma)
+
+    utility.imsave(data, "images/out_noise_reduction.png", "uint16")
+
+else:
+    pass
 
 # ===================================
 # Sharpening
@@ -216,3 +231,17 @@ else:
 # ===================================
 # Distortion correction
 # ===================================
+if do_distortion_correction:
+
+    # parameters
+    # correction_type="pincushion"
+    # strength = 0.0
+    # zoom = 1.0
+    #
+    # data = imaging.distortion_correction(data).empirical(correction_type, strength, zoom)
+
+    data = imaging.distortion_correction(data).empirical_correction()
+    utility.imsave(data, "images/out_distortion_correction.png", "uint16")
+
+else:
+    pass

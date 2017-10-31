@@ -14,7 +14,7 @@ def debayer_mhc(raw, bayer_pattern="rggb", clip_range=[0, 65535], timeshow=False
     raw = np.float32(raw)
 
     # dimensions
-    width, height = utility.get_width_height(raw)
+    width, height = utility.helpers(raw).get_width_height()
 
     # number of pixels to pad
     no_of_pixel_pad = 2

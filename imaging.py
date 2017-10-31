@@ -222,7 +222,7 @@ def bad_pixel_correction(data, neighborhood_size):
         print("bad pixel correction: Quarter " + str(idx+1) + " of 4")
 
         img = D[idx]
-        width, height = utility.get_width_height(img)
+        width, height = utility.helpers(img).get_width_height()
 
         # pad pixels at the borders
         img = np.pad(img, \
@@ -325,7 +325,7 @@ class lens_shading_correction:
         # Note: approximate_mathematical_compensation require less memory
         print("----------------------------------------------------")
         print("Running lens shading correction with approximate mathematical compensation...")
-        width, height = utility.get_width_height(self.data)
+        width, height = utility.helpers(self.data).get_width_height()
 
         center_pixel_pos = [height/2, width/2]
         max_distance = utility.distance_euclid(center_pixel_pos, [height, width])
@@ -378,14 +378,14 @@ class bayer_denoising:
         # to make sure no change happen to self.data
         raw = self.data
         raw = np.clip(raw, clip_range[0], clip_range[1])
-        width, height = utility.get_width_height(raw)
+        width, height = utility.helpers(raw).get_width_height()
 
         # First make the bayer_pattern rggb
         # The algorithm is written only for rggb pattern, thus convert all other
         # pattern to rggb. Furthermore, this shuffling does not affect the
         # algorithm output
         if (bayer_pattern != "rggb"):
-            raw = utility.shuffle_bayer_pattern(self.data, bayer_pattern, "rggb")
+            raw = utility.helpers(self.data).shuffle_bayer_pattern(bayer_pattern, "rggb")
 
         # fixed neighborhood_size
         neighborhood_size = 5 # we are keeping this fixed
@@ -642,7 +642,7 @@ class color_correction:
         cam2rgb = self.calculate_cam2rgb()
 
         # get width and height
-        width, height = utility.get_width_height(self.data)
+        width, height = utility.helpers(self.data).get_width_height()
 
         # apply the matrix
         R = self.data[:, :, 0]
@@ -747,7 +747,7 @@ class tone_mapping:
         # calculate the alpha image
         temp = np.power(0.5, mask)
         if (np.ndim(self.data) == 3):
-            width, height = utility.get_width_height(self.data)
+            width, height = utility.helpers(self.data).get_width_height()
             alpha = np.empty((height, width, 3), dtype=np.float32)
             alpha[:, :, 0] = temp
             alpha[:, :, 1] = temp
@@ -820,6 +820,162 @@ class sharpening:
         return np.clip(self.data + utility.special_function(\
                    image_high_pass).soft_coring(\
                    slope, tau_threshold, gamma_speed), clip_range[0], clip_range[1])
+
+    def __str__(self):
+        return self.name
+
+
+# =============================================================
+# class: noise_reduction
+#   reduce noise of the nonlinear image (after gamma)
+# =============================================================
+class noise_reduction:
+    def __init__(self, data, clip_range=[0, 65535], name="noise reduction"):
+        self.data = np.float32(data)
+        self.clip_range = clip_range
+        self.name = name
+
+    def sigma_filter(self, neighborhood_size=7, sigma=[6, 6, 6]):
+
+        print("----------------------------------------------------")
+        print("Running noise reduction by sigma filter...")
+
+        if np.ndim(self.data > 2): # if rgb image
+            output = np.empty(np.shape(self.data), dtype=np.float32)
+            for i in range(0, np.shape(self.data)[2]):
+                output[:, :, i] = utility.helpers(self.data[:, :, i]).sigma_filter_helper(neighborhood_size, sigma[i])
+            return np.clip(output, self.clip_range[0], self.clip_range[1])
+        else: # gray image
+            return np.clip(utility.helpers(self.data).sigma_filter_helper(neighborhood_size, sigma), self.clip_range[0], self.clip_range[1])
+
+    def __str__(self):
+        return self.name
+
+
+# =============================================================
+# class: distortion_correction
+#   correct the distortion
+# =============================================================
+class distortion_correction:
+    def __init__(self, data, name="distortion correction"):
+        self.data = np.float32(data)
+        self.name = name
+
+
+    def empirical_correction(self, correction_type="pincushion-1", strength=0.1, zoom_type="crop",interpolation_type="bilinear",fill_val=65535,clip_range=[0, 65535]):
+
+        # get half_width and half_height, assume this is the center
+        width, height = utility.helpers(self.data).get_width_height()
+        half_width = width / 2
+        half_height = height / 2
+
+        # create a meshgrid of points
+        xi, yi = np.meshgrid(np.linspace(-half_width, half_width, width),\
+                             np.linspace(-half_height, half_height, height))
+
+        # cartesian to polar coordinate
+        r = np.sqrt(xi**2 + yi**2)
+        theta = np.arctan2(yi, xi)
+
+        # maximum radius
+        R = math.sqrt(width**2 + height**2)
+
+        # make r within range 0~1
+        r = r / R
+
+        # apply the radius to the desired transformation
+        s = utility.special_function(r).distortion_function(correction_type, strength)
+
+        # select a scaling_parameter based on zoon_type and k value
+        if (strength<0):
+            if (zoom_type == "fit"):
+                scaling_parameter = r[0, 0] / s[0, 0]
+            elif (zoom_type == "crop"):
+                scaling_parameter = 1. / (1. + strength * (np.min([half_width, half_height])/R)**2)
+        else:
+            if (zoom_type == "fit"):
+                scaling_parameter = 1. / (1. + strength * (np.min([half_width, half_height])/R)**2)
+            elif (zoom_type == "crop"):
+                scaling_parameter = r[0, 0] / s[0, 0]
+
+        # multiply by scaling_parameter and un-normalize
+        s = s * scaling_parameter * R
+
+        # convert back to cartesian coordinate and add back the center coordinate
+        xt = np.multiply(s, np.cos(theta)) + half_width
+        yt = np.multiply(s, np.sin(theta)) + half_height
+
+        # clip
+        xt = np.int32(np.clip(np.round(xt), 0, width-1))
+        yt = np.int32(np.clip(np.round(yt), 0, height-1))
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+        output[:, :, 0] = self.data[yt, xt, 0]
+        output[:, :, 1] = self.data[yt, xt, 1]
+        output[:, :, 2] = self.data[yt, xt, 2]
+
+        return np.clip(output, clip_range[0], clip_range[1])
+
+
+    def empirical(self, correction_type="barrel", strength=1.5, zoom=1.2, clip_range=[0, 65535]):
+
+        print("----------------------------------------------------")
+        print("Running distortion correction by empirical method...")
+
+        # get with and height
+        width, height = utility.helpers(self.data).get_width_height()
+        half_width = width / 2.
+        half_height = height / 2.
+
+        # to prevent divide by zero
+        if (strength == 0):
+            strength = 0.00001
+
+        # calculate the correction_radius
+        correction_radius = math.sqrt(width**2 + height**2) / strength
+
+        # allocate space for output
+        output = np.zeros(np.shape(self.data), dtype=np.float32)
+
+        # main task
+        for y in range(0, height):
+            for x in range(0, width):
+
+                # coordinate from center
+                xc = x - half_width
+                yc = y - half_height
+
+                # distance from center
+                distance = math.sqrt(xc**2 + yc**2)
+                r = distance / correction_radius
+                # if (r == 0.):
+                #     theta = 1.
+
+                if (correction_type == "barrel"):
+                    if (r != 0.0):
+                        # theta = (1. / math.atan(r)) * r
+                        theta = 1. + r**2.2
+                    else:
+                        theta = 1.
+                elif (correction_type == "pincushion"):
+                    if (r != 0.0):
+                        #theta = (1. - r) / math.atan(1. - r)
+                        theta = 1. + r**(1/2.2)
+                    else:
+                        theta = 1.
+
+                source_x = half_width + theta * xc * zoom
+                source_y = half_height + theta * yc * zoom
+
+                source_x = np.clip(round(source_x), 0, width-1)
+                source_y = np.clip(round(source_y), 0, height-1)
+
+                output[y, x, 0] = self.data[source_y, source_x, 0]
+                output[y, x, 1] = self.data[source_y, source_x, 1]
+                output[y, x, 2] = self.data[source_y, source_x, 2]
+
+        return np.clip(output, clip_range[0], clip_range[1])
+
 
     def __str__(self):
         return self.name

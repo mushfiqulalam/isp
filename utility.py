@@ -118,18 +118,164 @@ def imsave(data, output_name, output_dtype="uint8", input_dtype="uint8", is_scal
 
 
 # =============================================================
-# function: get_width_height
-#   returns width, height
+# class: helpers
+#   a class of useful helper functions
 # =============================================================
-def get_width_height(data):
-    # We assume data be in height x width x number of channel x frames format
-    if (np.ndim(data) > 1):
-        size = np.shape(data)
-        width = size[1]
-        height = size[0]
-        return width, height
-    else:
-        print("data dimension must be 2 or greater")
+class helpers:
+    def __init__(self, data=None, name="helper"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def get_width_height(self):
+        #------------------------------------------------------
+        # returns width, height
+        # We assume data be in height x width x number of channel x frames format
+        #------------------------------------------------------
+        if (np.ndim(self.data) > 1):
+            size = np.shape(self.data)
+            width = size[1]
+            height = size[0]
+            return width, height
+        else:
+            print("Error! data dimension must be 2 or greater")
+
+    def bayer_channel_separation(self, pattern):
+        #------------------------------------------------------
+        # function: bayer_channel_separation
+        #   Objective: Outputs four channels of the bayer pattern
+        #   Input:
+        #       data:   the bayer data
+        #       pattern:    rggb, grbg, gbrg, or bggr
+        #   Output:
+        #       R, G1, G2, B (Quarter resolution images)
+        #------------------------------------------------------
+        if (pattern == "rggb"):
+            R = self.data[::2, ::2]
+            G1 = self.data[::2, 1::2]
+            G2 = self.data[1::2, ::2]
+            B = self.data[1::2, 1::2]
+        elif (pattern == "grbg"):
+            G1 = self.data[::2, ::2]
+            R = self.data[::2, 1::2]
+            B = self.data[1::2, ::2]
+            G2 = self.data[1::2, 1::2]
+        elif (pattern == "gbrg"):
+            G1 = self.data[::2, ::2]
+            B = self.data[::2, 1::2]
+            R = self.data[1::2, ::2]
+            G2 = self.data[1::2, 1::2]
+        elif (pattern == "bggr"):
+            B = self.data[::2, ::2]
+            G1 = self.data[::2, 1::2]
+            G2 = self.data[1::2, ::2]
+            R = self.data[1::2, 1::2]
+        else:
+            print("pattern must be one of these: rggb, grbg, gbrg, bggr")
+            return
+
+        return R, G1, G2, B
+
+
+    def bayer_channel_integration(self, R, G1, G2, B, pattern):
+        #------------------------------------------------------
+        # function: bayer_channel_integration
+        #   Objective: combine data into a raw according to pattern
+        #   Input:
+        #       R, G1, G2, B:   the four separate channels (Quarter resolution)
+        #       pattern:    rggb, grbg, gbrg, or bggr
+        #   Output:
+        #       data (Full resolution image)
+        #------------------------------------------------------
+        size = np.shape(R)
+        data = np.empty((size[0]*2, size[1]*2), dtype=np.float32)
+        if (pattern == "rggb"):
+            data[::2, ::2] = R
+            data[::2, 1::2] = G1
+            data[1::2, ::2] = G2
+            data[1::2, 1::2] = B
+        elif (pattern == "grbg"):
+            data[::2, ::2] = G1
+            data[::2, 1::2] = R
+            data[1::2, ::2] = B
+            data[1::2, 1::2] = G2
+        elif (pattern == "gbrg"):
+            data[::2, ::2] = G1
+            data[::2, 1::2] = B
+            data[1::2, ::2] = R
+            data[1::2, 1::2] = G2
+        elif (pattern == "bggr"):
+            data[::2, ::2] = B
+            data[::2, 1::2] = G1
+            data[1::2, ::2] = G2
+            data[1::2, 1::2] = R
+        else:
+            print("pattern must be one of these: rggb, grbg, gbrg, bggr")
+            return
+
+        return data
+
+
+    def shuffle_bayer_pattern(self, input_pattern, output_pattern):
+        #------------------------------------------------------
+        # function: shuffle_bayer_pattern
+        #   convert from one bayer pattern to another
+        #------------------------------------------------------
+
+        # Get separate channels
+        R, G1, G2, B = self.bayer_channel_separation(input_pattern)
+
+        # return integrated data
+        return self.bayer_channel_integration(R, G1, G2, B, output_pattern)
+
+
+    def sigma_filter_helper(self, neighborhood_size, sigma):
+
+        if (neighborhood_size % 2) == 0:
+            print("Error! neighborhood_size must be odd for example 3, 5, 7")
+            return
+
+        # number of pixels to be padded at the borders
+        no_of_pixel_pad = math.floor(neighborhood_size / 2.)
+
+        # get width, height
+        width, height = self.get_width_height()
+
+        # pad pixels at the borders
+        img = np.pad(self.data, \
+                     (no_of_pixel_pad, no_of_pixel_pad),\
+                     'reflect') # reflect would not repeat the border value
+
+        # allocate memory for output
+        output = np.empty((height, width), dtype=np.float32)
+
+        for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
+            for j in range(no_of_pixel_pad, width + no_of_pixel_pad):
+
+                # save the middle pixel value
+                mid_pixel_val = img[i, j]
+
+                # extract the neighborhood
+                neighborhood = img[i - no_of_pixel_pad : i + no_of_pixel_pad+1,\
+                                   j - no_of_pixel_pad : j + no_of_pixel_pad+1]
+
+                lower_range = mid_pixel_val - sigma
+                upper_range = mid_pixel_val + sigma
+
+                temp = 0.
+                ctr = 0
+                for ni in range (0, neighborhood_size):
+                    for nj in range (0, neighborhood_size):
+                        if (neighborhood[ni, nj] > lower_range) and (neighborhood[ni, nj] < upper_range):
+                            temp += neighborhood[ni, nj]
+                            ctr += 1
+
+                output[i - no_of_pixel_pad, j - no_of_pixel_pad] = temp / ctr
+
+        return output
+
+
+    def __str__(self):
+        return self.name
 
 
 # =============================================================
@@ -166,6 +312,23 @@ class special_function:
         #                           smaller value gives a little bit more
         #                           sharpened image, this may be a fine tuner
         return slope * self.data * ( 1. - np.exp(-((np.abs(self.data / tau_threshold))**gamma_speed)))
+
+
+    def distortion_function(self, correction_type="barrel-1", strength=0.1):
+        
+        if (correction_type == "pincushion-1"):
+            return np.divide(self.data, 1. + strength * self.data)
+        elif (correction_type == "pincushion-2"):
+            return np.divide(self.data, 1. + strength * np.power(self.data, 2))
+        elif (correction_type == "barrel-1"):
+            return np.multiply(self.data, 1. + strength * self.data)
+        elif (correction_type == "barrel-2"):
+            return np.multiply(self.data, 1. + strength * np.power(self.data, 2))
+        else:
+            print("Warning! Unknown correction_type.")
+            return
+
+
 
 
 # =============================================================
@@ -211,95 +374,6 @@ class synthetic_image_generate:
     def create_noisy_image(self, data, mean=0, standard_deviation=1, seed=0, clip_range=[0, 65535]):
         # Adds normally distributed noise to the data
         return np.clip(data + self.create_random_noise_image(mean, standard_deviation, seed), clip_range[0], clip_range[1])
-
-
-# =============================================================
-# function: bayer_channel_separation
-#   Objective: Outputs four channels of the bayer pattern
-#   Input:
-#       data:   the bayer data
-#       pattern:    rggb, grbg, gbrg, or bggr
-#   Output:
-#       R, G1, G2, B (Quarter resolution images)
-# =============================================================
-def bayer_channel_separation(data, pattern):
-    if (pattern == "rggb"):
-        R = data[::2, ::2]
-        G1 = data[::2, 1::2]
-        G2 = data[1::2, ::2]
-        B = data[1::2, 1::2]
-    elif (pattern == "grbg"):
-        G1 = data[::2, ::2]
-        R = data[::2, 1::2]
-        B = data[1::2, ::2]
-        G2 = data[1::2, 1::2]
-    elif (pattern == "gbrg"):
-        G1 = data[::2, ::2]
-        B = data[::2, 1::2]
-        R = data[1::2, ::2]
-        G2 = data[1::2, 1::2]
-    elif (pattern == "bggr"):
-        B = data[::2, ::2]
-        G1 = data[::2, 1::2]
-        G2 = data[1::2, ::2]
-        R = data[1::2, 1::2]
-    else:
-        print("pattern must be one of these: rggb, grbg, gbrg, bggr")
-        return
-
-    return R, G1, G2, B
-
-
-# =============================================================
-# function: bayer_channel_integration
-#   Objective: combine data into a raw according to pattern
-#   Input:
-#       R, G1, G2, B:   the four separate channels (Quarter resolution)
-#       pattern:    rggb, grbg, gbrg, or bggr
-#   Output:
-#       data (Full resolution image)
-# =============================================================
-def bayer_channel_integration(R, G1, G2, B, pattern):
-    size = np.shape(R)
-    data = np.empty((size[0]*2, size[1]*2), dtype=np.float32)
-    if (pattern == "rggb"):
-        data[::2, ::2] = R
-        data[::2, 1::2] = G1
-        data[1::2, ::2] = G2
-        data[1::2, 1::2] = B
-    elif (pattern == "grbg"):
-        data[::2, ::2] = G1
-        data[::2, 1::2] = R
-        data[1::2, ::2] = B
-        data[1::2, 1::2] = G2
-    elif (pattern == "gbrg"):
-        data[::2, ::2] = G1
-        data[::2, 1::2] = B
-        data[1::2, ::2] = R
-        data[1::2, 1::2] = G2
-    elif (pattern == "bggr"):
-        data[::2, ::2] = B
-        data[::2, 1::2] = G1
-        data[1::2, ::2] = G2
-        data[1::2, 1::2] = R
-    else:
-        print("pattern must be one of these: rggb, grbg, gbrg, bggr")
-        return
-
-    return data
-
-
-# =============================================================
-# function: shuffle_bayer_pattern
-#   convert from one bayer pattern to another
-# =============================================================
-def shuffle_bayer_pattern(data, input_pattern, output_pattern):
-
-    # Get separate channels
-    R, G1, G2, B = bayer_channel_separation(data, input_pattern)
-
-    # return integrated data
-    return bayer_channel_integration(R, G1, G2, B, output_pattern)
 
 
 # =============================================================
@@ -372,6 +446,44 @@ class color_conversion:
         return 0.299 * self.data[:, :, 0] +\
                0.587 * self.data[:, :, 1] +\
                0.114 * self.data[:, :, 2]
+
+    def rgb2ycc(self, rule="bt601"):
+
+        # map to select kr and kb
+        kr_kb_dict = {"bt601" : [0.299, 0.114],\
+                      "bt709" : [0.2126, 0.0722],\
+                      "bt2020" : [0.2627, 0.0593]}
+
+        kr = kr_kb_dict[rule][0]
+        kb = kr_kb_dict[rule][1]
+        kg = 1 - (kr + kb)
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+        output[:, :, 0] = kr * self.data[:, :, 0] + \
+                          kg * self.data[:, :, 1] + \
+                          kb * self.data[:, :, 2]
+        output[:, :, 1] = 0.5 * ((self.data[:, :, 2] - output[:, :, 0]) / (1 - kb))
+        output[:, :, 2] = 0.5 * ((self.data[:, :, 0] - output[:, :, 0]) / (1 - kr))
+
+        return output
+
+    def ycc2rgb(self, rule="bt601"):
+
+        # map to select kr and kb
+        kr_kb_dict = {"bt601" : [0.299, 0.114],\
+                      "bt709" : [0.2126, 0.0722],\
+                      "bt2020" : [0.2627, 0.0593]}
+
+        kr = kr_kb_dict[rule][0]
+        kb = kr_kb_dict[rule][1]
+        kg = 1 - (kr + kb)
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+        output[:, :, 0] = 2. * self.data[:, :, 2] * (1 - kr) + self.data[:, :, 0]
+        output[:, :, 2] = 2. * self.data[:, :, 1] * (1 - kb) + self.data[:, :, 0]
+        output[:, :, 1] = (self.data[:, :, 0] - kr * output[:, :, 0] - kb * output[:, :, 2]) / kg
+
+        return output
 
     def __str__(self):
         return self.name
