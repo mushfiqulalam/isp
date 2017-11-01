@@ -273,6 +273,36 @@ class helpers:
 
         return output
 
+    def bilinear_interpolation(self, x, y):
+
+        width, height = self.get_width_height()
+
+        x0 = np.floor(x).astype(int)
+        x1 = x0 + 1
+        y0 = np.floor(y).astype(int)
+        y1 = y0 + 1
+
+        x0 = np.clip(x0, 0, width-1)
+        x1 = np.clip(x1, 0, width-1)
+        y0 = np.clip(y0, 0, height-1)
+        y1 = np.clip(y1, 0, height-1)
+
+        Ia = self.data[y0, x0]
+        Ib = self.data[y1, x0]
+        Ic = self.data[y0, x1]
+        Id = self.data[y1, x1]
+
+
+        x = np.clip(x, 0, width-1)
+        y = np.clip(y, 0, height-1)
+
+        wa = (x1 - x) * (y1 - y)
+        wb = (x1 - x) * (y - y0)
+        wc = (x - x0) * (y1 - y)
+        wd = (x - x0) * (y - y0)
+
+        return wa * Ia + wb * Ib + wc * Ic + wd * Id
+
 
     def __str__(self):
         return self.name
@@ -315,7 +345,7 @@ class special_function:
 
 
     def distortion_function(self, correction_type="barrel-1", strength=0.1):
-        
+
         if (correction_type == "pincushion-1"):
             return np.divide(self.data, 1. + strength * self.data)
         elif (correction_type == "pincushion-2"):

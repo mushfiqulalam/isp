@@ -12,6 +12,7 @@ import utility
 import debayer
 import sys          # float precision
 from scipy import signal        # convolutions
+from scipy import interpolate   # for interpolation
 
 
 
@@ -862,7 +863,38 @@ class distortion_correction:
         self.name = name
 
 
-    def empirical_correction(self, correction_type="pincushion-1", strength=0.1, zoom_type="crop",interpolation_type="bilinear",fill_val=65535,clip_range=[0, 65535]):
+    def empirical_correction(self, correction_type="pincushion-1", strength=0.1, zoom_type="crop", clip_range=[0, 65535]):
+        #------------------------------------------------------
+        # Objective:
+        #   correct geometric distortion with the assumption that the distortion
+        #   is symmetric and the center is at the center of of the image
+        # Input:
+        #   correction_type:    which type of correction needed to be carried
+        #                       out, choose one the four:
+        #                       pincushion-1, pincushion-2, barrel-1, barrel-2
+        #                       1 and 2 are difference between the power
+        #                       over the radius
+        #
+        #   strength:           should be equal or greater than 0.
+        #                       0 means no correction will be done.
+        #                       if negative value were applied correction_type
+        #                       will be reversed. Thus,>=0 value expected.
+        #
+        #   zoom_type:          either "fit" or "crop"
+        #                       fit will return image with full content
+        #                       in the whole area
+        #                       crop will return image will 0 values outsise
+        #                       the border
+        #
+        #   clip_range:         to clip the final image within the range
+        #------------------------------------------------------
+
+        if (strength < 0):
+            print("Warning! strength should be equal of greater than 0.")
+            return self.data
+
+        print("----------------------------------------------------")
+        print("Running distortion correction by empirical method...")
 
         # get half_width and half_height, assume this is the center
         width, height = utility.helpers(self.data).get_width_height()
@@ -887,12 +919,12 @@ class distortion_correction:
         s = utility.special_function(r).distortion_function(correction_type, strength)
 
         # select a scaling_parameter based on zoon_type and k value
-        if (strength<0):
+        if ((correction_type=="barrel-1") or (correction_type=="barrel-2")):
             if (zoom_type == "fit"):
                 scaling_parameter = r[0, 0] / s[0, 0]
             elif (zoom_type == "crop"):
                 scaling_parameter = 1. / (1. + strength * (np.min([half_width, half_height])/R)**2)
-        else:
+        elif ((correction_type=="pincushion-1") or (correction_type=="pincushion-2")):
             if (zoom_type == "fit"):
                 scaling_parameter = 1. / (1. + strength * (np.min([half_width, half_height])/R)**2)
             elif (zoom_type == "crop"):
@@ -902,77 +934,21 @@ class distortion_correction:
         s = s * scaling_parameter * R
 
         # convert back to cartesian coordinate and add back the center coordinate
-        xt = np.multiply(s, np.cos(theta)) + half_width
-        yt = np.multiply(s, np.sin(theta)) + half_height
+        xt = np.multiply(s, np.cos(theta))
+        yt = np.multiply(s, np.sin(theta))
 
-        # clip
-        xt = np.int32(np.clip(np.round(xt), 0, width-1))
-        yt = np.int32(np.clip(np.round(yt), 0, height-1))
+        # interpolation
+        if np.ndim(self.data == 3):
 
-        output = np.empty(np.shape(self.data), dtype=np.float32)
-        output[:, :, 0] = self.data[yt, xt, 0]
-        output[:, :, 1] = self.data[yt, xt, 1]
-        output[:, :, 2] = self.data[yt, xt, 2]
+            output = np.empty(np.shape(self.data), dtype=np.float32)
 
-        return np.clip(output, clip_range[0], clip_range[1])
+            output[:, :, 0] = utility.helpers(self.data[:, :, 0]).bilinear_interpolation(xt + half_width, yt + half_height)
+            output[:, :, 1] = utility.helpers(self.data[:, :, 1]).bilinear_interpolation(xt + half_width, yt + half_height)
+            output[:, :, 2] = utility.helpers(self.data[:, :, 2]).bilinear_interpolation(xt + half_width, yt + half_height)
 
+        elif np.ndim(self.data == 2):
 
-    def empirical(self, correction_type="barrel", strength=1.5, zoom=1.2, clip_range=[0, 65535]):
-
-        print("----------------------------------------------------")
-        print("Running distortion correction by empirical method...")
-
-        # get with and height
-        width, height = utility.helpers(self.data).get_width_height()
-        half_width = width / 2.
-        half_height = height / 2.
-
-        # to prevent divide by zero
-        if (strength == 0):
-            strength = 0.00001
-
-        # calculate the correction_radius
-        correction_radius = math.sqrt(width**2 + height**2) / strength
-
-        # allocate space for output
-        output = np.zeros(np.shape(self.data), dtype=np.float32)
-
-        # main task
-        for y in range(0, height):
-            for x in range(0, width):
-
-                # coordinate from center
-                xc = x - half_width
-                yc = y - half_height
-
-                # distance from center
-                distance = math.sqrt(xc**2 + yc**2)
-                r = distance / correction_radius
-                # if (r == 0.):
-                #     theta = 1.
-
-                if (correction_type == "barrel"):
-                    if (r != 0.0):
-                        # theta = (1. / math.atan(r)) * r
-                        theta = 1. + r**2.2
-                    else:
-                        theta = 1.
-                elif (correction_type == "pincushion"):
-                    if (r != 0.0):
-                        #theta = (1. - r) / math.atan(1. - r)
-                        theta = 1. + r**(1/2.2)
-                    else:
-                        theta = 1.
-
-                source_x = half_width + theta * xc * zoom
-                source_y = half_height + theta * yc * zoom
-
-                source_x = np.clip(round(source_x), 0, width-1)
-                source_y = np.clip(round(source_y), 0, height-1)
-
-                output[y, x, 0] = self.data[source_y, source_x, 0]
-                output[y, x, 1] = self.data[source_y, source_x, 1]
-                output[y, x, 2] = self.data[source_y, source_x, 2]
+            output = utility.helpers(self.data).bilinear_interpolation(xt + half_width, yt + half_height)
 
         return np.clip(output, clip_range[0], clip_range[1])
 

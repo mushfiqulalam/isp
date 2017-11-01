@@ -10,18 +10,18 @@ import os,sys
 # ===================================
 # Which stages to run
 # ===================================
-do_add_noise = False
+do_add_noise = True
 do_black_level_correction = True
-do_lens_shading_correction = False #True
-do_bad_pixel_correction = False
+do_lens_shading_correction = True
+do_bad_pixel_correction = True
 do_channel_gain_white_balance = True
-do_bayer_denoise = False
+do_bayer_denoise = True
 do_demosaic = True
 do_color_correction = True
 do_gamma = True
-do_tone_mapping = False #True
-do_noise_reduction = False
-do_sharpening = False
+do_tone_mapping = True
+do_noise_reduction = True
+do_sharpening = True
 do_distortion_correction = True
 
 # ===================================
@@ -233,14 +233,12 @@ else:
 # ===================================
 if do_distortion_correction:
 
-    # parameters
-    # correction_type="pincushion"
-    # strength = 0.0
-    # zoom = 1.0
-    #
-    # data = imaging.distortion_correction(data).empirical(correction_type, strength, zoom)
+    correction_type="barrel-1"
+    strength=0.5
+    zoom_type="fit"
+    clip_range=[0, 65535]
 
-    data = imaging.distortion_correction(data).empirical_correction()
+    data = imaging.distortion_correction(data).empirical_correction(correction_type, strength, zoom_type, clip_range)
     utility.imsave(data, "images/out_distortion_correction.png", "uint16")
 
 else:
