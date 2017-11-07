@@ -1,20 +1,31 @@
 # isp
-This package delivers algorithms for a camera pipeline, where the pipeline starts by reading the raw image and metadata information, and generating an output rgb image. The sections are:
-(1) Black level correction__
-(2) Vignetting / Lens roll off correction__
-(3) Bad pixel correction
-(4) Channel balance gain
-(5) Bayer noise reduction
-(6) Green imbalance correction
-(7) Demosaic
-(8) Color aliasing correction
-(9) Color correction
-(10) Gamma
-(11) Tone mapping
-(12) Memory color enhancement
-(13) Noise reduction
-(14) Sharpening
-(15) Distortion correction
+==============================================================================  
+OBJECTIVE  
+==============================================================================  
+This package delivers algorithms for a camera pipeline, where the pipeline starts by reading the raw image and metadata information, and generating an output rgb image.
+
+==============================================================================   
+SECTIONS  
+==============================================================================  
+Currently the package contains at least one algorithm for the following sections:  
+=> Black level correction  
+=> Vignetting / lens shading correction  
+=> Bad pixel correction  
+=> Channel gain white balance  
+=> Bayer denoise  
+=> Demosaic  
+=> Color correction  
+=> Gamma  
+=> Tone mapping  
+=> Noise reduction  
+=> Sharpening  
+=> Distortion correction  
+
+In future algorithms for the following sections will be added:  
+=> Memory color enhancement  
+=> Color aliasing correction  
+=> Chromatic aberration correction  
+=> Green imbalance correction
 
 In this developing work I will add more and more algorithms.
 
