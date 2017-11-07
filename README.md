@@ -1,25 +1,23 @@
 # isp
-==============================================================================  
 OBJECTIVE  
-==============================================================================  
 This package delivers algorithms for a camera pipeline, where the pipeline starts by reading the raw image and metadata information, and generating an output rgb image.
-
-==============================================================================   
+ 
 SECTIONS  
-==============================================================================  
 Currently the package contains at least one algorithm for the following sections:  
-=> Black level correction  
-=> Vignetting / lens shading correction  
-=> Bad pixel correction  
-=> Channel gain white balance  
-=> Bayer denoise  
-=> Demosaic  
-=> Color correction  
-=> Gamma  
-=> Tone mapping  
-=> Noise reduction  
-=> Sharpening  
-=> Distortion correction  
+=> Black level correction[e]  
+=> Vignetting / lens shading correction[e]  
+=> Bad pixel correction[e]  
+=> Channel gain white balance[e]  
+=> Bayer denoise[d]  
+=> Demosaic[m]  
+=> Color correction[e]  
+=> Gamma[e]  
+=> Tone mapping[e]  
+=> Noise reduction[e]  
+=> Sharpening[e]  
+=> Distortion correction[e]  
+
+where, [e], [m], and [d] denote currently algorithmically easy, moderate, or difficult, respectively.
 
 In future algorithms for the following sections will be added:  
 => Memory color enhancement  
@@ -27,10 +25,10 @@ In future algorithms for the following sections will be added:
 => Chromatic aberration correction  
 => Green imbalance correction
 
-In this developing work I will add more and more algorithms.
+In this package several raw images are given in the "images" folder. Some tables are given in the "tables" folder, and demo images are given in the "demo_images" folder.
 
-Furthermore, several input images are provided so that you can test the code.
+INSTALLATION
+Code is written in python3 and tested in mac. Following packages need to be installed: numpy, scipy, matplotlib. Once packages are installed run the main.py file. This may help to install python3: https://stackoverflow.com/questions/24615005/how-to-install-numpy-for-python-3-3-5-on-mac-osx-10-9
 
-Link to the original algorithms are provided for further studies.
-
-Please leave your thoughts and comments at: mushfiqulalam@gmail.com
+COMMENTS
+Please leave your thoughts and comments: mushfiqulalam@gmail.com
