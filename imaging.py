@@ -955,3 +955,19 @@ class distortion_correction:
 
     def __str__(self):
         return self.name
+
+
+# =============================================================
+# class: memory_color_enhancement
+#   enhance memory colors such as sky, grass, skin color
+# =============================================================
+class memory_color_enhancement:
+    def __init__(self, data, name="memory color enhancement"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def by_hue_squeeze(self, target_hue, hue_preference, hue_sigma, is_both_side, multiplier, chroma_preference, chroma_sigma):
+        pass
+
+    def __str__(self):
+        return self.name
