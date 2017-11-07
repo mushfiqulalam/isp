@@ -20,7 +20,7 @@ do_demosaic = True
 do_color_correction = True
 do_gamma = True
 do_tone_mapping = True
-do_memory_color_enhancement = False
+do_memory_color_enhancement = True # False
 do_noise_reduction = False
 do_sharpening = False
 do_distortion_correction = False
@@ -231,7 +231,24 @@ else:
 # Memory color enhancement
 # ===================================
 if do_memory_color_enhancement:
-    pass
+
+    target_hue = [30., -115., 100.]
+    hue_preference = [45., -90., 130.]
+    hue_sigma = [20., 10., 5.]
+    is_both_side = [True, False, False]
+    multiplier = [0.6, 0.6, 0.6]
+    chroma_preference = [25., 17., 30.]
+    chroma_sigma = [10., 10., 5.]
+
+    data = imaging.memory_color_enhancement(data).by_hue_squeeze(target_hue,\
+                                                                 hue_preference,\
+                                                                 hue_sigma,\
+                                                                 is_both_side,\
+                                                                 multiplier,\
+                                                                 chroma_preference,\
+                                                                 chroma_sigma)
+
+    utility.imsave(data, "images/" + image_name + "_out_memory_color_enhancement.png", "uint16")
 
 else:
     pass

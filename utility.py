@@ -758,6 +758,25 @@ class color_conversion:
 
         return output
 
+    def lab2lch(self):
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+
+        output[:, :, 0] = self.data[:, :, 0] # L transfers directly
+        output[:, :, 1] = np.power(np.power(self.data[:, :, 1], 2) + np.power(self.data[:, :, 2], 2), 0.5)
+        output[:, :, 2] = np.arctan2(self.data[:, :, 2], self.data[:, :, 1]) * 180 / np.pi
+
+        return output
+
+    def lch2lab(self):
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+
+        output[:, :, 0] = self.data[:, :, 0] # L transfers directly
+        output[:, :, 1] = np.multiply(np.cos(self.data[:, :, 2] * np.pi / 180), self.data[:, :, 1])
+        output[:, :, 2] = np.multiply(np.sin(self.data[:, :, 2] * np.pi / 180), self.data[:, :, 1])
+
+        return output
 
     def __str__(self):
         return self.name

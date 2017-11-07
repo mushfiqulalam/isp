@@ -966,8 +966,47 @@ class memory_color_enhancement:
         self.data = np.float32(data)
         self.name = name
 
-    def by_hue_squeeze(self, target_hue, hue_preference, hue_sigma, is_both_side, multiplier, chroma_preference, chroma_sigma):
-        pass
+    def by_hue_squeeze(self, target_hue, hue_preference, hue_sigma, is_both_side, multiplier, chroma_preference, chroma_sigma, color_space="srgb", illuminant="d65", clip_range=[0, 65535], cie_version="1931"):
+
+        # RGB to xyz
+        data = utility.color_conversion(self.data).rgb2xyz(color_space, clip_range)
+        # xyz to lab
+        data = utility.color_conversion(data).xyz2lab(cie_version, illuminant)
+        # lab to lch
+        data = utility.color_conversion(data).lab2lch()
+
+        # hue squeezing
+        # we are traversing through different color preferences
+        width, height = utility.helpers(self.data).get_width_height()
+        hue_correction = np.zeros((height, width), dtype=np.float32)
+        for i in range(0, np.size(target_hue)):
+
+            delta_hue = data[:, :, 2] - hue_preference[i]
+
+            if is_both_side[i]:
+                weight_temp = np.exp( -np.power(data[:, :, 2] - target_hue[i], 2) / (2 * hue_sigma[i]**2)) + \
+                              np.exp( -np.power(data[:, :, 2] + target_hue[i], 2) / (2 * hue_sigma[i]**2))
+            else:
+                weight_temp = np.exp( -np.power(data[:, :, 2] - target_hue[i], 2) / (2 * hue_sigma[i]**2))
+
+            weight_hue = multiplier[i] * weight_temp / np.max(weight_temp)
+
+            weight_chroma = np.exp( -np.power(data[:, :, 1] - chroma_preference[i], 2) / (2 * chroma_sigma[i]**2))
+
+            hue_correction = hue_correction + np.multiply(np.multiply(delta_hue, weight_hue), weight_chroma)
+
+        # correct the hue
+        data[:, :, 2] = data[:, :, 2] - hue_correction
+
+        # lch to lab
+        data = utility.color_conversion(data).lch2lab()
+        # lab to xyz
+        data = utility.color_conversion(data).lab2xyz(cie_version, illuminant)
+        # xyz to rgb
+        data = utility.color_conversion(data).xyz2rgb(color_space, clip_range)
+
+        return data
+
 
     def __str__(self):
         return self.name
