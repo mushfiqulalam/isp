@@ -1,9 +1,7 @@
 # isp
-camera pipeline
-
-Starting from raw to final jpg image there are multiple operations such as:
-(1) Black level correction
-(2) Vignetting / Lens roll off correction
+This package delivers algorithms for a camera pipeline, where the pipeline starts by reading the raw image and metadata information, and generating an output rgb image. The sections are:
+(1) Black level correction__
+(2) Vignetting / Lens roll off correction__
 (3) Bad pixel correction
 (4) Channel balance gain
 (5) Bayer noise reduction
