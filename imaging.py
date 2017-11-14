@@ -285,6 +285,101 @@ class demosaic:
 
         return debayer.debayer_mhc(self.data, self.bayer_pattern, self.clip_range, timeshow)
 
+    def post_process_local_color_ratio(self, beta):
+
+        print("----------------------------------------------------")
+        print("Demosaicing post process using local color ratio...")
+
+        data = self.data
+
+        # add beta with the data to prevent divide by zero
+        data_beta = self.data + beta
+
+        # # G by B
+        # mask = signal.convolve2d(gray_image, gaussian_kernel, mode="same", boundary="symm")
+
+        # convolution kernels
+        # zeta1 averages the up, down, left, and right four values of a 3x3 window
+        zeta1 = np.multiply([[0., 1., 0.], [1., 0., 1.], [0., 1., 0.]], .25)
+        # zeta2 averages the four corner values of a 3x3 window
+        zeta2 = np.multiply([[1., 0., 1.], [0., 0., 0.], [1., 0., 1.]], .25)
+
+        # average of color ratio
+        g_over_b = signal.convolve2d(np.divide(data_beta[:, :, 1], data_beta[:, :, 2]), zeta1, mode="same", boundary="symm")
+        g_over_r = signal.convolve2d(np.divide(data_beta[:, :, 1], data_beta[:, :, 0]), zeta1, mode="same", boundary="symm")
+        b_over_g_zeta2 = signal.convolve2d(np.divide(data_beta[:, :, 2], data_beta[:, :, 1]), zeta2, mode="same", boundary="symm")
+        r_over_g_zeta2 = signal.convolve2d(np.divide(data_beta[:, :, 0], data_beta[:, :, 1]), zeta2, mode="same", boundary="symm")
+        b_over_g_zeta1 = signal.convolve2d(np.divide(data_beta[:, :, 2], data_beta[:, :, 1]), zeta1, mode="same", boundary="symm")
+        r_over_g_zeta1 = signal.convolve2d(np.divide(data_beta[:, :, 0], data_beta[:, :, 1]), zeta1, mode="same", boundary="symm")
+
+        # G at B locations and G at R locations
+        if self.bayer_pattern == "rggb":
+            # G at B locations
+            data[1::2, 1::2, 1] = -beta + np.multiply(data_beta[1::2, 1::2, 2], g_over_b[1::2, 1::2])
+            # G at R locations
+            data[::2, ::2, 1] = -beta + np.multiply(data_beta[::2, ::2, 0], g_over_r[::2, ::2])
+            # B at R locations
+            data[::2, ::2, 2] = -beta + np.multiply(data_beta[::2, ::2, 1], b_over_g_zeta2[::2, ::2])
+            # R at B locations
+            data[1::2, 1::2, 0] = -beta + np.multiply(data_beta[1::2, 1::2, 1], r_over_g_zeta2[1::2, 1::2])
+            # B at G locations
+            data[::2, 1::2, 2] = -beta + np.multiply(data_beta[::2, 1::2, 1], b_over_g_zeta1[::2, 1::2])
+            data[1::2, ::2, 2] = -beta + np.multiply(data_beta[1::2, ::2, 1], b_over_g_zeta1[1::2, ::2])
+            # R at G locations
+            data[::2, 1::2, 0] = -beta + np.multiply(data_beta[::2, 1::2, 1], r_over_g_zeta1[::2, 1::2])
+            data[1::2, ::2, 0] = -beta + np.multiply(data_beta[1::2, ::2, 1], r_over_g_zeta1[1::2, ::2])
+
+        elif self.bayer_pattern == "grbg":
+            # G at B locations
+            data[1::2, ::2, 1] = -beta + np.multiply(data_beta[1::2, ::2, 2], g_over_b[1::2, 1::2])
+            # G at R locations
+            data[::2, 1::2, 1] = -beta + np.multiply(data_beta[::2, 1::2, 0], g_over_r[::2, 1::2])
+            # B at R locations
+            data[::2, 1::2, 2] = -beta + np.multiply(data_beta[::2, 1::2, 1], b_over_g_zeta2[::2, 1::2])
+            # R at B locations
+            data[1::2, ::2, 0] = -beta + np.multiply(data_beta[1::2, ::2, 1], r_over_g_zeta2[1::2, ::2])
+            # B at G locations
+            data[::2, ::2, 2] = -beta + np.multiply(data_beta[::2, ::2, 1], b_over_g_zeta1[::2, ::2])
+            data[1::2, 1::2, 2] = -beta + np.multiply(data_beta[1::2, 1::2, 1], b_over_g_zeta1[1::2, 1::2])
+            # R at G locations
+            data[::2, ::2, 0] = -beta + np.multiply(data_beta[::2, ::2, 1], r_over_g_zeta1[::2, ::2])
+            data[1::2, 1::2, 0] = -beta + np.multiply(data_beta[1::2, 1::2, 1], r_over_g_zeta1[1::2, 1::2])
+
+        elif self.bayer_pattern == "gbrg":
+            # G at B locations
+            data[::2, 1::2, 1] = -beta + np.multiply(data_beta[::2, 1::2, 2], g_over_b[::2, 1::2])
+            # G at R locations
+            data[1::2, ::2, 1] = -beta + np.multiply(data_beta[1::2, ::2, 0], g_over_r[1::2, ::2])
+            # B at R locations
+            data[1::2, ::2, 2] = -beta + np.multiply(data_beta[1::2, ::2, 1], b_over_g_zeta2[1::2, ::2])
+            # R at B locations
+            data[::2, 1::2, 0] = -beta + np.multiply(data_beta[::2, 1::2, 1], r_over_g_zeta2[::2, 1::2])
+            # B at G locations
+            data[::2, ::2, 2] = -beta + np.multiply(data_beta[::2, ::2, 1], b_over_g_zeta1[::2, ::2])
+            data[1::2, 1::2, 2] = -beta + np.multiply(data_beta[1::2, 1::2, 1], b_over_g_zeta1[1::2, 1::2])
+            # R at G locations
+            data[::2, ::2, 0] = -beta + np.multiply(data_beta[::2, ::2, 1], r_over_g_zeta1[::2, ::2])
+            data[1::2, 1::2, 0] = -beta + np.multiply(data_beta[1::2, 1::2, 1], r_over_g_zeta1[1::2, 1::2])
+
+        elif self.bayer_pattern == "bggr":
+            # G at B locations
+            data[::2, ::2, 1] = -beta + np.multiply(data_beta[::2, ::2, 2], g_over_b[::2, ::2])
+            # G at R locations
+            data[1::2, 1::2, 1] = -beta + np.multiply(data_beta[1::2, 1::2, 0], g_over_r[1::2, 1::2])
+            # B at R locations
+            data[1::2, 1::2, 2] = -beta + np.multiply(data_beta[1::2, 1::2, 1], b_over_g_zeta2[1::2, 1::2])
+            # R at B locations
+            data[::2, ::2, 0] = -beta + np.multiply(data_beta[::2, ::2, 1], r_over_g_zeta2[::2, ::2])
+            # B at G locations
+            data[::2, 1::2, 2] = -beta + np.multiply(data_beta[::2, 1::2, 1], b_over_g_zeta1[::2, 1::2])
+            data[1::2, ::2, 2] = -beta + np.multiply(data_beta[1::2, ::2, 1], b_over_g_zeta1[1::2, ::2])
+            # R at G locations
+            data[::2, 1::2, 0] = -beta + np.multiply(data_beta[::2, 1::2, 1], r_over_g_zeta1[::2, 1::2])
+            data[1::2, ::2, 0] = -beta + np.multiply(data_beta[1::2, ::2, 1], r_over_g_zeta1[1::2, ::2])
+
+
+        return np.clip(data, self.clip_range[0], self.clip_range[1])
+
     def __str__(self):
         return self.name
 

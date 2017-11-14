@@ -17,10 +17,11 @@ do_bad_pixel_correction = False #True
 do_channel_gain_white_balance = True
 do_bayer_denoise = False #True
 do_demosaic = True
+do_demosaic_artifact_reduction = True
 do_color_correction = True
 do_gamma = True
-do_tone_mapping = True
-do_memory_color_enhancement = True # False
+do_tone_mapping = False #True
+do_memory_color_enhancement = False
 do_noise_reduction = False
 do_sharpening = False
 do_distortion_correction = False
@@ -182,8 +183,14 @@ else:
     pass
 
 # ===================================
-# Color aliasing correction
+# Demosaic artifact reduction
 # ===================================
+if do_demosaic_artifact_reduction:
+    data = imaging.demosaic(data).post_process_local_color_ratio(0.80 * 65535)
+    utility.imsave(data, "images/" + image_name + "_out_local_color_ratio.png", "uint16")
+else:
+    pass
+
 
 # ===================================
 # Color correction
