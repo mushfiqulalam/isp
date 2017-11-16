@@ -17,7 +17,7 @@ do_bad_pixel_correction = False #True
 do_channel_gain_white_balance = True
 do_bayer_denoise = False #True
 do_demosaic = True
-do_demosaic_artifact_reduction = True
+do_demosaic_artifact_reduction = False #True
 do_color_correction = True
 do_gamma = True
 do_tone_mapping = False #True
@@ -186,8 +186,14 @@ else:
 # Demosaic artifact reduction
 # ===================================
 if do_demosaic_artifact_reduction:
-    data = imaging.demosaic(data).post_process_local_color_ratio(0.80 * 65535)
-    utility.imsave(data, "images/" + image_name + "_out_local_color_ratio.png", "uint16")
+    # data = imaging.demosaic(data).post_process_local_color_ratio(0.80 * 65535)
+    # utility.imsave(data, "images/" + image_name + "_out_local_color_ratio.png", "uint16")
+
+    edge_detection_kernel_size = 5
+    edge_threshold = 0.05
+    data, edge_location = imaging.demosaic(data).post_process_median_filter(edge_detection_kernel_size, edge_threshold)
+    utility.imsave(data, "images/" + image_name + "_out_median_filter.png", "uint16")
+    utility.imsave(edge_location*65535, "images/" + image_name + "_edge_location.png", "uint16")
 else:
     pass
 

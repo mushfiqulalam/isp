@@ -295,9 +295,6 @@ class demosaic:
         # add beta with the data to prevent divide by zero
         data_beta = self.data + beta
 
-        # # G by B
-        # mask = signal.convolve2d(gray_image, gaussian_kernel, mode="same", boundary="symm")
-
         # convolution kernels
         # zeta1 averages the up, down, left, and right four values of a 3x3 window
         zeta1 = np.multiply([[0., 1., 0.], [1., 0., 1.], [0., 1., 0.]], .25)
@@ -379,6 +376,24 @@ class demosaic:
 
 
         return np.clip(data, self.clip_range[0], self.clip_range[1])
+
+    def post_process_median_filter(self, edge_detect_kernel_size=3, edge_threshold=0, median_filter_kernel_size=3, clip_range=[0, 65535]):
+
+        # detect edge locations
+        edge_location = utility.edge_detection(self.data).sobel(edge_detect_kernel_size, "is_edge", edge_threshold)
+
+        # allocate space for output
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+
+        if (np.ndim(self.data) > 2):
+
+            for i in range(0, np.shape(self.data)[2]):
+                output[:, :, i] = utility.helpers(self.data[:, :, i]).edge_wise_median(median_filter_kernel_size, edge_location[:, :, i])
+
+        elif (np.ndim(self.data) == 2):
+            output = utility.helpers(self.data).edge_wise_median(median_filter_kernel_size, edge_location)
+
+        return output, edge_location
 
     def __str__(self):
         return self.name

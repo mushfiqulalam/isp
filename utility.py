@@ -11,6 +11,7 @@ import png
 import numpy as np
 import scipy.misc
 import math
+from scipy import signal        # convolutions
 
 # =============================================================
 # function: imsave
@@ -422,6 +423,60 @@ class helpers:
 
         return np.divide(xyz_reference_dictionary[illuminant], 100.0)
 
+    def sobel_prewitt_direction_label(self, gradient_magnitude, theta, threshold=0):
+
+        direction_label = np.zeros(np.shape(gradient_magnitude), dtype=np.float32)
+
+        theta = np.asarray(theta)
+        # vertical
+        mask = ((theta >= -22.5) & (theta <= 22.5))
+        direction_label[mask] = 3.
+
+        # +45 degree
+        mask = ((theta > 22.5) & (theta <= 67.5))
+        direction_label[mask] = 2.
+
+        # -45 degree
+        mask = ((theta < -22.5) & (theta >= -67.5))
+        direction_label[mask] = 4.
+
+        # horizontal
+        mask = ((theta > 67.5) & (theta <= 90.)) | ((theta < -67.5) & (theta >= -90.))
+        direction_label[mask] = 1.
+
+        gradient_magnitude = np.asarray(gradient_magnitude)
+        mask = gradient_magnitude < threshold
+        direction_label[mask] = 0.
+
+        return direction_label
+
+    def edge_wise_median(self, kernel_size, edge_location):
+
+        # pad two pixels at the border
+        no_of_pixel_pad = math.floor(kernel_size / 2)   # number of pixels to pad
+
+        data = self.data
+        data = np.pad(data, \
+                      (no_of_pixel_pad, no_of_pixel_pad),\
+                      'reflect') # reflect would not repeat the border value
+
+        edge_location = np.pad(edge_location,\
+                              (no_of_pixel_pad, no_of_pixel_pad),\
+                              'reflect') # reflect would not repeat the border value
+
+        width, height = self.get_width_height()
+        output = np.empty((height, width), dtype=np.float32)
+
+        for i in range(no_of_pixel_pad, height + no_of_pixel_pad):
+            for j in range(no_of_pixel_pad, width + no_of_pixel_pad):
+                if (edge_location[i, j] == 1):
+                    output[i - no_of_pixel_pad, j - no_of_pixel_pad] = \
+                                 np.median(data[i - no_of_pixel_pad : i + no_of_pixel_pad + 1,\
+                                                j - no_of_pixel_pad : j + no_of_pixel_pad + 1])
+                elif (edge_location[i, j] == 0):
+                    output[i - no_of_pixel_pad, j - no_of_pixel_pad] = data[i, j]
+
+        return output
 
     def __str__(self):
         return self.name
@@ -577,6 +632,23 @@ class create_filter:
         hy = hy / np.sum(hy)
 
         return hx, hy
+
+    def sobel(self, kernel_size):
+        # Returns the Sobel filter kernels Sx and Sy
+
+        Sx = .25 * np.dot([[1.], [2.], [1.]], [[1., 0., -1.]])
+
+        if (kernel_size > 3):
+
+            n = np.int(np.floor((kernel_size - 5) / 2 + 1))
+
+            for i in range(0, n):
+
+                Sx = (1./16.) * signal.convolve2d(np.dot([[1.], [2.], [1.]], [[1., 2., 1.]]), Sx)
+
+        Sy = np.transpose(Sx)
+
+        return Sx, Sy
 
     def __str__(self):
         return self.name
@@ -777,6 +849,76 @@ class color_conversion:
         output[:, :, 2] = np.multiply(np.sin(self.data[:, :, 2] * np.pi / 180), self.data[:, :, 1])
 
         return output
+
+    def __str__(self):
+        return self.name
+
+
+# =============================================================
+# class: edge_detection
+#   detect edges in an image
+# =============================================================
+class edge_detection:
+    def __init__(self, data, name="edge detection"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def sobel(self, kernel_size=3, output_type="all", threshold=0., clip_range=[0, 65535]):
+
+        Sx, Sy = create_filter().sobel(kernel_size)
+
+        # Gradient in x direction: Gx
+        # Gradient in y direction: Gy
+        if np.ndim(self.data) > 2:
+
+            Gx = np.empty(np.shape(self.data), dtype=np.float32)
+            Gy = np.empty(np.shape(self.data), dtype=np.float32)
+
+            for dimension_idx in range(0, np.shape(self.data)[2]):
+                Gx[:, :, dimension_idx] = signal.convolve2d(self.data[:, :, dimension_idx], Sx, mode="same", boundary="symm")
+                Gy[:, :, dimension_idx] = signal.convolve2d(self.data[:, :, dimension_idx], Sy, mode="same", boundary="symm")
+
+        elif np.ndim(self.data) == 2:
+            Gx = signal.convolve2d(self.data, Sx, mode="same", boundary="symm")
+            Gy = signal.convolve2d(self.data, Sy, mode="same", boundary="symm")
+
+        else:
+            print("Warning! Data dimension must be 2 or 3.")
+
+        # Gradient magnitude
+        G = np.power(np.power(Gx, 2) + np.power(Gy, 2), .5)
+
+        # Gradient angle
+        theta = np.arctan(np.divide(Gy, Gx)) * 180. / np.pi
+
+        if (output_type == "gradient_magnitude_and_angle"):
+            return G, theta
+
+        # Change the threshold according to the clip_range's maximum value
+        threshold = threshold * clip_range[1]
+
+        # calculating if the edge is a strong edge
+        is_edge = np.zeros(np.shape(self.data), dtype=np.int)
+        mask = G > threshold
+        is_edge[mask] = 1
+
+        if (output_type == "is_edge"):
+            return is_edge
+
+
+        # Edge direction label
+        temp = np.asarray(theta)
+        direction_label = np.zeros(np.shape(self.data), dtype=np.float32)
+
+        if np.ndim(self.data > 2):
+            for i in range(0, np.shape(self.data)[2]):
+                direction_label[:, :, i] = helpers().sobel_prewitt_direction_label(G[:, :, i], theta[:, :, i], threshold)
+        else:
+            direction_label = helpers().sobel_prewitt_direction_label(G, theta, threshold)
+
+        if (output_type == "all"):
+            return G, Gx, Gy, theta, is_edge, direction_label
+
 
     def __str__(self):
         return self.name
