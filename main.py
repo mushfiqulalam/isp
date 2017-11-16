@@ -20,7 +20,7 @@ do_demosaic = True
 do_demosaic_artifact_reduction = False #True
 do_color_correction = True
 do_gamma = True
-do_tone_mapping = False #True
+do_tone_mapping = False
 do_memory_color_enhancement = False
 do_noise_reduction = False
 do_sharpening = False
@@ -186,14 +186,17 @@ else:
 # Demosaic artifact reduction
 # ===================================
 if do_demosaic_artifact_reduction:
-    # data = imaging.demosaic(data).post_process_local_color_ratio(0.80 * 65535)
-    # utility.imsave(data, "images/" + image_name + "_out_local_color_ratio.png", "uint16")
+
+    data = imaging.demosaic(data).post_process_local_color_ratio(0.80 * 65535)
+    utility.imsave(data, "images/" + image_name + "_out_local_color_ratio.png", "uint16")
 
     edge_detection_kernel_size = 5
     edge_threshold = 0.05
-    data, edge_location = imaging.demosaic(data).post_process_median_filter(edge_detection_kernel_size, edge_threshold)
+    # first output is main output, second output is edge_location is a debug output
+    data, _ = imaging.demosaic(data).post_process_median_filter(edge_detection_kernel_size, edge_threshold)
     utility.imsave(data, "images/" + image_name + "_out_median_filter.png", "uint16")
-    utility.imsave(edge_location*65535, "images/" + image_name + "_edge_location.png", "uint16")
+    # utility.imsave(edge_location*65535, "images/" + image_name + "_edge_location.png", "uint16")
+
 else:
     pass
 
@@ -212,10 +215,13 @@ else:
 # ===================================
 if do_gamma:
 
-    # by value
+    # brightening
+    data = imaging.nonlinearity(data, "brightening").luma_adjustment(30.)
+
+    # gamma by value
     #data = imaging.nonlinearity(data, "gamma").by_value(1/2.2, [0, 65535])
 
-    # by table
+    # gamma by table
     data = imaging.nonlinearity(data, "gamma").by_table("tables/GammaE.txt", "gamma", [0, 65535])
 
     utility.imsave(data, "images/" + image_name + "_out_gamma.png", "uint16")

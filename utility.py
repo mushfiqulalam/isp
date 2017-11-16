@@ -736,6 +736,16 @@ class color_conversion:
             output[:, :, 1] = data[:, :, 0] * 0.2973769 + data[:, :, 1] * 0.6273491 + data[:, :, 2] * 0.0752741
             output[:, :, 2] = data[:, :, 0] * 0.0270343 + data[:, :, 1] * 0.0706872 + data[:, :, 2] * 0.9911085
 
+        elif (color_space == "linear"):
+
+            # matrix multiplication`
+            output = np.empty(np.shape(self.data), dtype=np.float32)
+            data = np.float32(self.data)
+            data = np.divide(data, clip_range[1])
+            output[:, :, 0] = data[:, :, 0] * 0.4124 + data[:, :, 1] * 0.3576 + data[:, :, 2] * 0.1805
+            output[:, :, 1] = data[:, :, 0] * 0.2126 + data[:, :, 1] * 0.7152 + data[:, :, 2] * 0.0722
+            output[:, :, 2] = data[:, :, 0] * 0.0193 + data[:, :, 1] * 0.1192 + data[:, :, 2] * 0.9505
+
         else:
             print("Warning! color_space must be srgb or adobe-rgb-1998.")
             return
@@ -771,6 +781,17 @@ class color_conversion:
             # gamma to retain nonlinearity
             output = helpers(output * clip_range[1]).gamma_adobe_rgb_1998(clip_range)
 
+
+        elif (color_space == "linear"):
+
+            # matrix multiplication
+            output[:, :, 0] = self.data[:, :, 0] *  3.2406 + self.data[:, :, 1] * -1.5372 + self.data[:, :, 2] * -0.4986
+            output[:, :, 1] = self.data[:, :, 0] * -0.9689 + self.data[:, :, 1] *  1.8758 + self.data[:, :, 2] *  0.0415
+            output[:, :, 2] = self.data[:, :, 0] *  0.0557 + self.data[:, :, 1] * -0.2040 + self.data[:, :, 2] *  1.0570
+
+            # gamma to retain nonlinearity
+            output = output * clip_range[1]
+
         else:
             print("Warning! color_space must be srgb or adobe-rgb-1998.")
             return
@@ -792,9 +813,9 @@ class color_conversion:
         # if data[x, y, c] > 0.008856, data[x, y, c] = data[x, y, c] ^ (1/3)
         # else, data[x, y, c] = 7.787 * data[x, y, c] + 16/116
         mask = data > 0.008856
-        data[mask] **= 1/3
+        data[mask] **= 1./3.
         data[np.invert(mask)] *= 7.787
-        data[np.invert(mask)] += 16/116
+        data[np.invert(mask)] += 16./116.
 
         data = np.float32(data)
         output = np.empty(np.shape(self.data), dtype=np.float32)

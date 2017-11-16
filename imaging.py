@@ -286,6 +286,9 @@ class demosaic:
         return debayer.debayer_mhc(self.data, self.bayer_pattern, self.clip_range, timeshow)
 
     def post_process_local_color_ratio(self, beta):
+        # Objective is to reduce high chroma jump
+        # Beta is controlling parameter, higher gives more effect,
+        # however, too high does not make any more change
 
         print("----------------------------------------------------")
         print("Demosaicing post process using local color ratio...")
@@ -378,9 +381,23 @@ class demosaic:
         return np.clip(data, self.clip_range[0], self.clip_range[1])
 
     def post_process_median_filter(self, edge_detect_kernel_size=3, edge_threshold=0, median_filter_kernel_size=3, clip_range=[0, 65535]):
+        # Objective is to reduce the zipper effect around the edges
+        # Inputs:
+        #   edge_detect_kernel_size: the neighborhood size used to detect edges
+        #   edge_threshold: the threshold value above which (compared against)
+        #                   the gradient_magnitude to declare if it is an edge
+        #   median_filter_kernel_size: the neighborhood size used to perform
+        #                               median filter operation
+        #   clip_range: used for scaling in edge_detection
+        #
+        # Output:
+        #   output: median filtered output around the edges
+        #   edge_location: a debug image to see where the edges were detected
+        #                   based on the threshold
+
 
         # detect edge locations
-        edge_location = utility.edge_detection(self.data).sobel(edge_detect_kernel_size, "is_edge", edge_threshold)
+        edge_location = utility.edge_detection(self.data).sobel(edge_detect_kernel_size, "is_edge", edge_threshold, clip_range)
 
         # allocate space for output
         output = np.empty(np.shape(self.data), dtype=np.float32)
@@ -779,6 +796,17 @@ class nonlinearity:
     def __init__(self, data, name="nonlinearity"):
         self.data = np.float32(data)
         self.name = name
+
+    def luma_adjustment(self, multiplier, clip_range=[0, 65535]):
+        # The multiplier is applied only on luma channel
+        # by a multipler in log10 scale:
+        #   multipler 10 means multiplied by 1.
+        #   multipler 100 means multiplied by 2. as such
+
+        print("----------------------------------------------------")
+        print("Running brightening...")
+        
+        return np.clip(np.log10(multiplier) * self.data, clip_range[0], clip_range[1])
 
     def by_value(self, value, clip_range):
 
