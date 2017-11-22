@@ -478,6 +478,25 @@ class helpers:
 
         return output
 
+
+    def nonuniform_quantization(self):
+
+        output = np.zeros(np.shape(self.data), dtype=np.float32)
+        min_val = np.min(self.data)
+        max_val = np.max(self.data)
+
+        mask = (self.data > (7./8.) * (max_val - min_val))
+        output[mask] = 3.
+
+        mask = (self.data > (3./4.) * (max_val - min_val)) & (self.data <= (7./8.) * (max_val - min_val))
+        output[mask] = 2.
+
+        mask = (self.data > (1./2.) * (max_val - min_val)) & (self.data <= (3./4.) * (max_val - min_val))
+        output[mask] = 1.
+
+        return output
+
+
     def __str__(self):
         return self.name
 
@@ -908,6 +927,9 @@ class edge_detection:
 
         # Gradient magnitude
         G = np.power(np.power(Gx, 2) + np.power(Gy, 2), .5)
+
+        if (output_type == "gradient_magnitude"):
+            return G
 
         # Gradient angle
         theta = np.arctan(np.divide(Gy, Gx)) * 180. / np.pi

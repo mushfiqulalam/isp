@@ -805,7 +805,7 @@ class nonlinearity:
 
         print("----------------------------------------------------")
         print("Running brightening...")
-        
+
         return np.clip(np.log10(multiplier) * self.data, clip_range[0], clip_range[1])
 
     def by_value(self, value, clip_range):
@@ -1144,6 +1144,85 @@ class memory_color_enhancement:
         data = utility.color_conversion(data).xyz2rgb(color_space, clip_range)
 
         return data
+
+
+    def __str__(self):
+        return self.name
+
+
+# =============================================================
+# class: chromatic_aberration_correction
+#   removes artifacts similar to result from chromatic
+#   aberration
+# =============================================================
+class chromatic_aberration_correction:
+    def __init__(self, data, name="chromatic aberration correction"):
+        self.data = np.float32(data)
+        self.name = name
+
+    def purple_fringe_removal(self, nsr_threshold, cr_threshold, clip_range=[0, 65535]):
+        # --------------------------------------------------------------
+        # nsr_threshold: near saturated region threshold (in percentage)
+        # cr_threshold: candidate region threshold
+        # --------------------------------------------------------------
+
+        width, height = utility.helpers(self.data).get_width_height()
+
+        r = self.data[:, :, 0]
+        g = self.data[:, :, 1]
+        b = self.data[:, :, 2]
+
+        ## Detection of purple fringe
+        # near saturated region detection
+        nsr_threshold = clip_range[1] * nsr_threshold / 100
+        temp = (r + g + b) / 3
+        temp = np.asarray(temp)
+        mask = temp > nsr_threshold
+        nsr = np.zeros((height, width), dtype=np.int)
+        nsr[mask] = 1
+
+        # candidate region detection
+        temp = r - b
+        temp1 = b - g
+        temp = np.asarray(temp)
+        temp1 = np.asarray(temp1)
+        mask = (temp < cr_threshold) & (temp1 > cr_threshold)
+        cr = np.zeros((height, width), dtype=np.int)
+        cr[mask] = 1
+
+        # quantization
+        qr = utility.helpers(r).nonuniform_quantization()
+        qg = utility.helpers(g).nonuniform_quantization()
+        qb = utility.helpers(b).nonuniform_quantization()
+
+        g_qr = utility.edge_detection(qr).sobel(5, "gradient_magnitude")
+        g_qg = utility.edge_detection(qg).sobel(5, "gradient_magnitude")
+        g_qb = utility.edge_detection(qb).sobel(5, "gradient_magnitude")
+
+        g_qr = np.asarray(g_qr)
+        g_qg = np.asarray(g_qg)
+        g_qb = np.asarray(g_qb)
+
+        # bgm: binary gradient magnitude
+        bgm = np.zeros((height, width), dtype=np.float32)
+        mask = (g_qr != 0) | (g_qg != 0) | (g_qb != 0)
+        bgm[mask] = 1
+
+        fringe_map = np.multiply(np.multiply(nsr, cr), bgm)
+        fring_map = np.asarray(fringe_map)
+        mask = (fringe_map == 1)
+
+        r1 = r
+        g1 = g
+        b1 = b
+        r1[mask] = g1[mask] = b1[mask] = (r[mask] + g[mask] + b[mask]) / 3.
+
+        output = np.empty(np.shape(self.data), dtype=np.float32)
+        output[:, :, 0] = r1
+        output[:, :, 1] = g1
+        output[:, :, 2] = b1
+
+        return np.float32(output)
 
 
     def __str__(self):

@@ -7,36 +7,43 @@ import imaging
 import utility
 import os,sys
 
+
 # ===================================
 # Which stages to run
 # ===================================
-do_add_noise = False #True
+do_add_noise = False
 do_black_level_correction = True
-do_lens_shading_correction = False #True
-do_bad_pixel_correction = False #True
+do_lens_shading_correction = True
+do_bad_pixel_correction = True
 do_channel_gain_white_balance = True
-do_bayer_denoise = False #True
+do_bayer_denoise = False
 do_demosaic = True
-do_demosaic_artifact_reduction = False #True
+do_demosaic_artifact_reduction = True
 do_color_correction = True
 do_gamma = True
-do_tone_mapping = False
-do_memory_color_enhancement = False
+do_chromatic_aberration_correction = True
+do_tone_mapping = True
+do_memory_color_enhancement = True
 do_noise_reduction = False
-do_sharpening = False
-do_distortion_correction = False
+do_sharpening = True
+do_distortion_correction = True
+
 
 # ===================================
 # Remove all the .png files
 os.system("rm images/*.png")
 # ===================================
 
+
+
 # ===================================
 # raw image and set up the metadata
 # ===================================
 # uncomment the image_name to run it via pipeline
-image_name = "DSC_1339_768x512_rggb"        # image content: Rose
-# image_name = "DSC_1320_2048x2048_rggb"      # image content: Potrait
+image_name = "DSC_1339_768x512_rggb"            # image content: Rose
+# image_name = "DSC_1320_2048x2048_rggb"        # image content: Potrait
+# image_name = "DSC_1372_6032x4032_rggb"        # image content: Downtown San Jose
+# image_name = "DSC_1372_12096x6032_rgb_out_demosaic" # image content: Downtown San Jose after demosaic
 
 # read the raw image
 temp = np.fromfile("images/" + image_name + ".raw", dtype="uint16", sep="")
@@ -58,6 +65,8 @@ if (image_name == "DSC_1339_768x512_rggb"):
                           [-.4535, 1.2436, .2348],\
                           [-.0934, .1919,  .7086]])
 
+    data = raw.data
+
 elif (image_name == "DSC_1320_2048x2048_rggb"):
 
     temp = temp.reshape([2048, 2048])
@@ -74,11 +83,54 @@ elif (image_name == "DSC_1320_2048x2048_rggb"):
                           [-.4535, 1.2436, .2348],\
                           [-.0934, .1919,  .7086]])
 
+    data = raw.data
+
+
+elif (image_name == "DSC_1372_6032x4032_rggb"):
+
+    temp = temp.reshape([4032, 6032])
+    raw = imaging.ImageInfo("DSC_1372_6032x4032_rggb", temp)
+    raw.set_color_space("raw")
+    raw.set_bayer_pattern("rggb")
+    raw.set_channel_gain((1.94921875, 1.0, 1.0, 1.34375)) # Please shuffle the values
+                                                          # depending on bayer_pattern
+    raw.set_bit_depth(14)
+    raw.set_black_level((600, 600, 600, 600))
+    raw.set_white_level((15520, 15520, 15520, 15520))
+    # the ColotMatrix2 found from the metadata
+    raw.set_color_matrix([[.9020, -.2890, -.0715],\
+                          [-.4535, 1.2436, .2348],\
+                          [-.0934, .1919,  .7086]])
+
+    data = raw.data
+
+elif (image_name == "DSC_1372_12096x6032_rgb_out_demosaic"):
+
+    temp = temp.reshape([12096, 6032])
+    temp = np.float32(temp)
+    data = np.empty((4032, 6032, 3), dtype=np.float32)
+    data[:, :, 0] = temp[0:4032, :]
+    data[:, :, 1] = temp[4032 : 2*4032, :]
+    data[:, :, 2] = temp[2*4032 : 3*4032, :]
+
+    raw = imaging.ImageInfo("DSC_1372_12096x6032_rgb_out_demosaic", data)
+    raw.set_color_space("raw")
+    raw.set_bayer_pattern("rggb")
+    raw.set_channel_gain((1.94921875, 1.0, 1.0, 1.34375)) # Please shuffle the values
+                                                          # depending on bayer_pattern
+    raw.set_bit_depth(14)
+    raw.set_black_level((600, 600, 600, 600))
+    raw.set_white_level((15520, 15520, 15520, 15520))
+    # the ColotMatrix2 found from the metadata
+    raw.set_color_matrix([[.9020, -.2890, -.0715],\
+                          [-.4535, 1.2436, .2348],\
+                          [-.0934, .1919,  .7086]])
+
+
 else:
     print("Warning! image_name not recognized.")
 
 
-data = raw.data
 
 # ===================================
 # Add noise
@@ -216,7 +268,7 @@ else:
 if do_gamma:
 
     # brightening
-    data = imaging.nonlinearity(data, "brightening").luma_adjustment(30.)
+    data = imaging.nonlinearity(data, "brightening").luma_adjustment(80.)
 
     # gamma by value
     #data = imaging.nonlinearity(data, "gamma").by_value(1/2.2, [0, 65535])
@@ -233,6 +285,17 @@ else:
 # ===================================
 # Chromatic aberration correction
 # ===================================
+if do_chromatic_aberration_correction:
+
+    nsr_threshold = 90.
+    cr_threshold = 6425./2
+
+    data = imaging.chromatic_aberration_correction(data).purple_fringe_removal(nsr_threshold, cr_threshold)
+
+    utility.imsave(data, "images/" + image_name + "_out_purple_fringe_removal.png", "uint16")
+else:
+    pass
+
 
 # ===================================
 # Tone mapping
@@ -251,13 +314,22 @@ else:
 # ===================================
 if do_memory_color_enhancement:
 
-    target_hue = [30., -115., 100.]
-    hue_preference = [45., -90., 130.]
+    # target_hue = [30., -115., 100.]
+    # hue_preference = [45., -90., 130.]
+    # hue_sigma = [20., 10., 5.]
+    # is_both_side = [True, False, False]
+    # multiplier = [0.6, 0.6, 0.6]
+    # chroma_preference = [25., 17., 30.]
+    # chroma_sigma = [10., 10., 5.]
+
+    target_hue = [30., -125., 100.]
+    hue_preference = [20., -118., 130.]
     hue_sigma = [20., 10., 5.]
     is_both_side = [True, False, False]
     multiplier = [0.6, 0.6, 0.6]
-    chroma_preference = [25., 17., 30.]
+    chroma_preference = [25., 14., 30.]
     chroma_sigma = [10., 10., 5.]
+
 
     data = imaging.memory_color_enhancement(data).by_hue_squeeze(target_hue,\
                                                                  hue_preference,\

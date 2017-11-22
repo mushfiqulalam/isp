@@ -12,20 +12,17 @@ Currently the package contains at least one algorithm for the following sections
 => Channel gain white balance[e]  
 => Bayer denoise[d]  
 => Demosaic[m]  
+=> Demosaic artifact reduction [m]  
 => Color correction[e]  
 => Gamma[e]  
+=> Chromatic aberration correction [m]  
 => Tone mapping[e]  
+=> Memory color enhancement [m]  
 => Noise reduction[e]  
 => Sharpening[e]  
 => Distortion correction[e]  
 
 where, [e], [m], and [d] denote currently algorithmically easy, moderate, or difficult, respectively.
-
-In future algorithms for the following sections will be added:  
-=> Memory color enhancement  
-=> Color aliasing correction  
-=> Chromatic aberration correction  
-=> Green imbalance correction
 
 In this package several raw images are given in the "images" folder. Some tables are given in the "tables" folder, and demo images are given in the "demo_images" folder.
 
