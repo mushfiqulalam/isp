@@ -14,19 +14,19 @@ import os,sys
 do_add_noise = False
 do_black_level_correction = True
 do_lens_shading_correction = True
-do_bad_pixel_correction = True
+do_bad_pixel_correction = False
 do_channel_gain_white_balance = True
 do_bayer_denoise = False
 do_demosaic = True
-do_demosaic_artifact_reduction = True
+do_demosaic_artifact_reduction = False
 do_color_correction = True
 do_gamma = True
-do_chromatic_aberration_correction = True
-do_tone_mapping = True
-do_memory_color_enhancement = True
+do_chromatic_aberration_correction = False
+do_tone_mapping = False
+do_memory_color_enhancement = False
 do_noise_reduction = False
-do_sharpening = True
-do_distortion_correction = True
+do_sharpening = False
+do_distortion_correction = False
 
 
 # ===================================
@@ -40,9 +40,12 @@ os.system("rm images/*.png")
 # raw image and set up the metadata
 # ===================================
 # uncomment the image_name to run it via pipeline
-image_name = "DSC_1339_768x512_rggb"            # image content: Rose
+# image_name = "DSC_1339_768x512_rggb"            # image content: Rose rggb
+# image_name = "DSC_1339_768x512_gbrg"            # image content: Rose gbrg
+# image_name = "DSC_1339_768x512_grbg"            # image content: Rose grbg
+# image_name = "DSC_1339_768x512_bggr"            # image content: Rose bggr
 # image_name = "DSC_1320_2048x2048_rggb"        # image content: Potrait
-# image_name = "DSC_1372_6032x4032_rggb"        # image content: Downtown San Jose
+image_name = "DSC_1372_6032x4032_rggb"        # image content: Downtown San Jose
 # image_name = "DSC_1372_12096x6032_rgb_out_demosaic" # image content: Downtown San Jose after demosaic
 
 # read the raw image
@@ -56,6 +59,60 @@ if (image_name == "DSC_1339_768x512_rggb"):
     raw.set_color_space("raw")
     raw.set_bayer_pattern("rggb")
     raw.set_channel_gain((1.94921875, 1.0, 1.0, 1.34375)) # Please shuffle the values
+                                                          # depending on bayer_pattern
+    raw.set_bit_depth(14)
+    raw.set_black_level((600, 600, 600, 600))
+    raw.set_white_level((15520, 15520, 15520, 15520))
+    # the ColorMatrix2 found from the metadata
+    raw.set_color_matrix([[.9020, -.2890, -.0715],\
+                          [-.4535, 1.2436, .2348],\
+                          [-.0934, .1919,  .7086]])
+
+    data = raw.data
+
+elif (image_name == "DSC_1339_768x512_gbrg"):
+
+    temp = temp.reshape([512, 768])
+    raw = imaging.ImageInfo("1339_768x512_gbrg", temp)
+    raw.set_color_space("raw")
+    raw.set_bayer_pattern("gbrg")
+    raw.set_channel_gain((1.0, 1.34375, 1.94921875, 1.0)) # Please shuffle the values
+                                                          # depending on bayer_pattern
+    raw.set_bit_depth(14)
+    raw.set_black_level((600, 600, 600, 600))
+    raw.set_white_level((15520, 15520, 15520, 15520))
+    # the ColorMatrix2 found from the metadata
+    raw.set_color_matrix([[.9020, -.2890, -.0715],\
+                          [-.4535, 1.2436, .2348],\
+                          [-.0934, .1919,  .7086]])
+
+    data = raw.data
+
+elif (image_name == "DSC_1339_768x512_grbg"):
+
+    temp = temp.reshape([512, 768])
+    raw = imaging.ImageInfo("1339_768x512_grbg", temp)
+    raw.set_color_space("raw")
+    raw.set_bayer_pattern("grbg")
+    raw.set_channel_gain((1.0, 1.94921875, 1.34375, 1.0)) # Please shuffle the values
+                                                          # depending on bayer_pattern
+    raw.set_bit_depth(14)
+    raw.set_black_level((600, 600, 600, 600))
+    raw.set_white_level((15520, 15520, 15520, 15520))
+    # the ColorMatrix2 found from the metadata
+    raw.set_color_matrix([[.9020, -.2890, -.0715],\
+                          [-.4535, 1.2436, .2348],\
+                          [-.0934, .1919,  .7086]])
+
+    data = raw.data
+
+elif (image_name == "DSC_1339_768x512_bggr"):
+
+    temp = temp.reshape([512, 768])
+    raw = imaging.ImageInfo("1339_768x512_bggr", temp)
+    raw.set_color_space("raw")
+    raw.set_bayer_pattern("bggr")
+    raw.set_channel_gain((1.34375, 1.0, 1.0, 1.94921875,)) # Please shuffle the values
                                                           # depending on bayer_pattern
     raw.set_bit_depth(14)
     raw.set_black_level((600, 600, 600, 600))
@@ -229,7 +286,9 @@ else:
 # Demosacing
 # ===================================
 if do_demosaic:
-    data = imaging.demosaic(data, raw.get_bayer_pattern()).mhc(False)
+    #data = imaging.demosaic(data, raw.get_bayer_pattern()).mhc(False)
+
+    data = imaging.demosaic(data, raw.get_bayer_pattern()).directionally_weighted_gradient_based_interpolation()
     utility.imsave(data, "images/" + image_name + "_out_demosaic.png", "uint16")
 else:
     pass

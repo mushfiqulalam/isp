@@ -281,7 +281,7 @@ class demosaic:
     def mhc(self, timeshow=False):
 
         print("----------------------------------------------------")
-        print("Running demosaicing...")
+        print("Running demosaicing using Malvar-He-Cutler algorithm...")
 
         return debayer.debayer_mhc(self.data, self.bayer_pattern, self.clip_range, timeshow)
 
@@ -379,6 +379,28 @@ class demosaic:
 
 
         return np.clip(data, self.clip_range[0], self.clip_range[1])
+
+
+    def directionally_weighted_gradient_based_interpolation(self):
+        # Reference:
+        # http://www.arl.army.mil/arlreports/2010/ARL-TR-5061.pdf
+
+        print("----------------------------------------------------")
+        print("Running demosaicing using directionally weighted gradient based interpolation...")
+
+        # Fill up the green channel
+        G = debayer.fill_channel_directional_weight(self.data, self.bayer_pattern)
+
+        B, R = debayer.fill_br_locations(self.data, G, self.bayer_pattern)
+
+        width, height = utility.helpers(self.data).get_width_height()
+        output = np.empty((height, width, 3), dtype=np.float32)
+        output[:, :, 0] = R
+        output[:, :, 1] = G
+        output[:, :, 2] = B
+
+        return np.clip(output, self.clip_range[0], self.clip_range[1])
+
 
     def post_process_median_filter(self, edge_detect_kernel_size=3, edge_threshold=0, median_filter_kernel_size=3, clip_range=[0, 65535]):
         # Objective is to reduce the zipper effect around the edges
