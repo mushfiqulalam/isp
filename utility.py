@@ -11,7 +11,9 @@ import png
 import numpy as np
 import scipy.misc
 import math
-from scipy import signal        # convolutions
+from scipy import signal        # for convolutions
+from scipy import ndimage       # for n-dimensional convolution
+from scipy import interpolate
 
 # =============================================================
 # function: imsave
@@ -356,7 +358,6 @@ class helpers:
         # rescale
         return np.clip(data * clip_range[1], clip_range[0], clip_range[1])
 
-
     def gamma_adobe_rgb_1998(self, clip_range=[0, 65535]):
 
         # bring data in range 0 to 1
@@ -551,6 +552,120 @@ class special_function:
             print("Warning! Unknown correction_type.")
             return
 
+    def bilateral_filter(self, edge):
+        # bilateral filter based upon the work of
+        # Jiawen Chen, Sylvain Paris, and Fredo Durand, 2007 work
+
+        # note: if edge data is not provided, image is served as edge
+        # this is called normal bilateral filter
+        # if edge data is provided, then it is called cross or joint
+        # bilateral filter
+
+        # get width and height of the image
+        width, height = helpers(self.data).get_width_height()
+
+        # sigma_spatial
+        sigma_spatial = min(height, width) / 16.
+
+        # calculate edge_delta
+        edge_min = np.min(edge)
+        edge_max = np.max(edge)
+        edge_delta = edge_max - edge_min
+
+        # sigma_range and sampling_range
+        sigma_range = 0.1 * edge_delta
+        sampling_range = sigma_range
+        sampling_spatial = sigma_spatial
+
+        # derived_sigma_spatial and derived_sigma_range
+        derived_sigma_spatial = sigma_spatial / sampling_spatial
+        derived_sigma_range = sigma_range / sampling_range
+
+        # paddings
+        padding_xy = np.floor(2. * derived_sigma_spatial) + 1.
+        padding_z = np.floor(2. * derived_sigma_range) + 1.
+
+        # downsamples
+        downsample_width = np.uint16(np.floor((width - 1.) / sampling_spatial) + 1. + 2. * padding_xy)
+        downsample_height = np.uint16(np.floor((height - 1.) / sampling_spatial) + 1. + 2. * padding_xy)
+        downsample_depth = np.uint16(np.floor(edge_delta / sampling_range) + 1. + 2. * padding_z)
+
+        grid_data = np.zeros((downsample_height, downsample_width, downsample_depth))
+        grid_weight = np.zeros((downsample_height, downsample_width, downsample_depth))
+
+        jj, ii = np.meshgrid(np.arange(0, width, 1),\
+                             np.arange(0, height, 1))
+
+        di = np.uint16(np.round( ii / sampling_spatial ) + padding_xy + 1.)
+        dj = np.uint16(np.round( jj / sampling_spatial ) + padding_xy + 1.)
+        dz = np.uint16(np.round( (edge - edge_min) / sampling_range ) + padding_z + 1.)
+
+
+        for i in range(0, height):
+            for j in range(0, width):
+
+                data_z = self.data[i, j]
+                if not np.isnan(data_z):
+                    dik = di[i, j]
+                    djk = dj[i, j]
+                    dzk = dz[i, j]
+
+                    grid_data[dik, djk, dzk] = grid_data[dik, djk, dzk] + data_z
+                    grid_weight[dik, djk, dzk] = grid_weight[dik, djk, dzk] + 1.
+
+
+        kernel_width = 2. * derived_sigma_spatial + 1.
+        kernel_height = kernel_width
+        kernel_depth = 2. * derived_sigma_range + 1.
+
+        half_kernel_width = np.floor(kernel_width / 2.)
+        half_kernel_height = np.floor(kernel_height / 2.)
+        half_kernel_depth = np.floor(kernel_depth / 2.)
+
+        grid_x, grid_y, grid_z = np.meshgrid(np.arange(0, kernel_width, 1),\
+                                             np.arange(0, kernel_height, 1),\
+                                             np.arange(0, kernel_depth, 1))
+
+        grid_x = grid_x - half_kernel_width
+        grid_y = grid_y - half_kernel_height
+        grid_z = grid_z - half_kernel_depth
+
+        grid_r_squared = ( ( np.multiply(grid_x, grid_x) + \
+                             np.multiply(grid_y, grid_y) ) / np.multiply(derived_sigma_spatial, derived_sigma_spatial) ) + \
+                         ( np.multiply(grid_z, grid_z) / np.multiply(derived_sigma_range, derived_sigma_range) )
+
+        kernel = np.exp(-0.5 * grid_r_squared)
+        blurred_grid_data = ndimage.convolve(grid_data, kernel, mode='reflect')
+        blurred_grid_weight = ndimage.convolve(grid_weight, kernel, mode='reflect')
+
+        # divide
+        blurred_grid_weight = np.asarray(blurred_grid_weight)
+        mask = blurred_grid_weight == 0
+        blurred_grid_weight[mask] = -2.
+        normalized_blurred_grid = np.divide(blurred_grid_data, blurred_grid_weight)
+        mask = blurred_grid_weight < -1
+        normalized_blurred_grid[mask] = 0.
+        blurred_grid_weight[mask] = 0.
+
+        # upsample
+        jj, ii = np.meshgrid(np.arange(0, width, 1),\
+                             np.arange(0, height, 1))
+
+        di = (ii / sampling_spatial) + padding_xy + 1.
+        dj = (jj / sampling_spatial) + padding_xy + 1.
+        dz = (edge - edge_min) / sampling_range + padding_z + 1.
+
+        # arrange the input points
+        n_i, n_j, n_z = np.shape(normalized_blurred_grid)
+        points = (np.arange(0, n_i, 1), np.arange(0, n_j, 1), np.arange(0, n_z, 1))
+
+        # query points
+        xi = (di, dj, dz)
+
+        # multidimensional interpolation
+        output = interpolate.interpn(points, normalized_blurred_grid, xi, method='linear')
+
+        return output
 
 
 

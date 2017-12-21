@@ -22,7 +22,7 @@ do_demosaic_artifact_reduction = False
 do_color_correction = True
 do_gamma = True
 do_chromatic_aberration_correction = False
-do_tone_mapping = False
+do_tone_mapping = True
 do_memory_color_enhancement = False
 do_noise_reduction = False
 do_sharpening = False
@@ -40,12 +40,12 @@ os.system("rm images/*.png")
 # raw image and set up the metadata
 # ===================================
 # uncomment the image_name to run it via pipeline
-# image_name = "DSC_1339_768x512_rggb"            # image content: Rose rggb
+image_name = "DSC_1339_768x512_rggb"            # image content: Rose rggb
 # image_name = "DSC_1339_768x512_gbrg"            # image content: Rose gbrg
 # image_name = "DSC_1339_768x512_grbg"            # image content: Rose grbg
 # image_name = "DSC_1339_768x512_bggr"            # image content: Rose bggr
 # image_name = "DSC_1320_2048x2048_rggb"        # image content: Potrait
-image_name = "DSC_1372_6032x4032_rggb"        # image content: Downtown San Jose
+# image_name = "DSC_1372_6032x4032_rggb"        # image content: Downtown San Jose
 # image_name = "DSC_1372_12096x6032_rgb_out_demosaic" # image content: Downtown San Jose after demosaic
 
 # read the raw image
@@ -360,9 +360,12 @@ else:
 # Tone mapping
 # ===================================
 if do_tone_mapping:
-    data = imaging.tone_mapping(data).nonlinear_masking(1.0)
 
-    utility.imsave(data, "images/" + image_name + "_out_tone_mapping.png", "uint16")
+    data = imaging.tone_mapping(data).nonlinear_masking(1.0)
+    utility.imsave(data, "images/" + image_name + "_out_tone_mapping_nl_masking.png", "uint16")
+
+    data = imaging.tone_mapping(data).dynamic_range_compression("normal", [-25., 260.], [0, 65535])
+    utility.imsave(data, "images/" + image_name + "_out_tone_mapping_drc.png", "uint16")
 
 else:
     pass

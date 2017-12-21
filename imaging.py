@@ -919,6 +919,35 @@ class tone_mapping:
         # output
         return np.clip(clip_range[1] * np.power(self.data/clip_range[1], alpha), clip_range[0], clip_range[1])
 
+    def dynamic_range_compression(self, drc_type="normal", drc_bound=[-40., 260.], clip_range=[0, 65535]):
+
+        ycc = utility.color_conversion(self.data).rgb2ycc("bt601")
+        y = ycc[:, :, 0]
+        cb = ycc[:, :, 1]
+        cr = ycc[:, :, 2]
+
+        if (drc_type == "normal"):
+            edge = y
+        elif (drc_type == "joint"):
+            edge = utility.edge_detection(y).sobel(3, "gradient_magnitude")
+
+        y_bilateral_filtered = utility.special_function(y).bilateral_filter(edge)
+        detail = np.divide(ycc[:, :, 0], y_bilateral_filtered)
+
+        C = drc_bound[0] * clip_range[1] / 255.
+        temp = drc_bound[1] * clip_range[1] / 255.
+        F = (temp * (C + clip_range[1])) / (clip_range[1] * (temp - C))
+        y_bilateral_filtered_contrast_reduced = F * (y_bilateral_filtered - (clip_range[1] / 2.)) + (clip_range[1] / 2.)
+
+        y_out = np.multiply(y_bilateral_filtered_contrast_reduced, detail)
+
+        ycc_out = ycc
+        ycc_out[:, :, 0] = y_out
+        rgb_out = utility.color_conversion(ycc_out).ycc2rgb("bt601")
+
+        return np.clip(rgb_out, clip_range[0], clip_range[1])
+
+
 # =============================================================
 # class: sharpening
 #   sharpens the image
