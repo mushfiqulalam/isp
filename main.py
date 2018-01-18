@@ -14,18 +14,18 @@ import os,sys
 do_add_noise = False
 do_black_level_correction = True
 do_lens_shading_correction = True
-do_bad_pixel_correction = False
+do_bad_pixel_correction = True
 do_channel_gain_white_balance = True
 do_bayer_denoise = False
 do_demosaic = True
-do_demosaic_artifact_reduction = False
+do_demosaic_artifact_reduction = True
 do_color_correction = True
 do_gamma = True
-do_chromatic_aberration_correction = False
+do_chromatic_aberration_correction = True
 do_tone_mapping = True
-do_memory_color_enhancement = False
-do_noise_reduction = False
-do_sharpening = False
+do_memory_color_enhancement = True
+do_noise_reduction = True
+do_sharpening = True
 do_distortion_correction = False
 
 
@@ -333,7 +333,10 @@ if do_gamma:
     #data = imaging.nonlinearity(data, "gamma").by_value(1/2.2, [0, 65535])
 
     # gamma by table
-    data = imaging.nonlinearity(data, "gamma").by_table("tables/GammaE.txt", "gamma", [0, 65535])
+    # data = imaging.nonlinearity(data, "gamma").by_table("tables/gamma_2.4.txt", "gamma", [0, 65535])
+
+    # gamma by value
+    data = imaging.nonlinearity(data, "gamma").by_equation(-0.9, -8.0, [0, 65535])
 
     utility.imsave(data, "images/" + image_name + "_out_gamma.png", "uint16")
 
@@ -364,8 +367,8 @@ if do_tone_mapping:
     data = imaging.tone_mapping(data).nonlinear_masking(1.0)
     utility.imsave(data, "images/" + image_name + "_out_tone_mapping_nl_masking.png", "uint16")
 
-    data = imaging.tone_mapping(data).dynamic_range_compression("normal", [-25., 260.], [0, 65535])
-    utility.imsave(data, "images/" + image_name + "_out_tone_mapping_drc.png", "uint16")
+    # data = imaging.tone_mapping(data).dynamic_range_compression("normal", [-25., 260.], [0, 65535])
+    # utility.imsave(data, "images/" + image_name + "_out_tone_mapping_drc.png", "uint16")
 
 else:
     pass

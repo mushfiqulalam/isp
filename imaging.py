@@ -859,6 +859,19 @@ class nonlinearity:
             # mapping is from gamma_table to linear_table
             return np.clip(np.interp(self.data, gamma_table, linear_table), clip_range[0], clip_range[1])
 
+    def by_equation(self, a, b, clip_range):
+
+        print("----------------------------------------------------")
+        print("Running nonlinearity by equation...")
+
+        # clip within the range
+        data = np.clip(self.data, clip_range[0], clip_range[1])
+        # make 0 to 1
+        data = data / clip_range[1]
+
+        # apply nonlinearity
+        return np.clip(clip_range[1] * (a * np.exp(b * data) + data + a * data - a * np.exp(b) * data - a), clip_range[0], clip_range[1])
+
     def __str__(self):
         return self.name
 
